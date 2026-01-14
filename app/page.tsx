@@ -6,113 +6,6 @@ import { ChevronLeft, ChevronRight, Heart, Star, User,  Search, ShoppingCart, Ch
 export default function LandingPage() {
  return (
     <main className="min-h-screen bg-white">
-      {/* TOP BAR - Flag + Language + Location on LEFT, Icons on RIGHT */}
-     <div className="bg-white py-3">
-        <div className="container mx-auto px-4 flex flex-wrap items-center justify-between gap-4 md:gap-6">
-          {/* Left: Logo + Flag + Language + Location */}
-          <div className="flex items-center gap-5 md:gap-8 flex-wrap">
-            {/* Logo */}
-            <Link href="/">
-              <Image src="/logo.png" alt="DEALP**RT" width={140} height={50} className="object-contain" />
-            </Link>
-
-            {/* Language Flag + EN */}
-            <button className="flex items-center gap-2 text-sm text-gray-700 hover:text-[#4EA674] transition">
-              <Image src="/ng.png" alt="Nigeria" width={20} height={14} className="rounded" />
-              EN
-              <ChevronDown className="w-4 h-4" />
-            </button>
-
-            {/* Deliver to Your address */}
-            <button className="flex items-center gap-2 text-sm text-gray-700 hover:text-[#4EA674] transition">
-              <MapPin className="w-4 h-4" />
-              Deliver to Your address
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Right: Icons + Cart + Small Search Bar - all on same line */}
-          <div className="flex items-center gap-4 md:gap-6">
-            {/* Small Search Bar */}
-            <div className="hidden md:block relative w-64 lg:w-80">
-              <input
-                type="text"
-                placeholder="What you're looking for"
-                className="w-full px-4 py-2.5 pl-10 pr-4 rounded-full bg-[#EAF8E7] text-gray-700 placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30 transition"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-            </div>
-
-            {/* Icons */}
-            <Link href="/account" className="p-2 hover:bg-gray-100 rounded-full transition">
-              <User className="w-6 h-6 text-gray-700" />
-            </Link>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition">
-              <Heart className="w-6 h-6 text-gray-700" />
-            </button>
-            <button className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full transition">
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
-              <span className="font-bold text-sm text-gray-700">₦0.00</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Search Bar for Mobile - below top bar, full width */}
-      <div className="md:hidden bg-white py-3 border-t">
-        <div className="container mx-auto px-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="What you're looking for"
-              className="w-full px-5 py-3 pl-12 rounded-full bg-[#EAF8E7] text-gray-700 placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30 transition"
-            />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-500" />
-          </div>
-        </div>
-      </div>
-
-      {/* Secondary Nav - Home, About Us, Contact Us + others */}
-      <nav className="bg-white py-3 ">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-wrap justify-center md:justify-between gap-6 text-sm font-medium text-gray-700">
-            {/* Left side */}
-            <div className="flex flex-wrap gap-6">
-              <Link href="/admin/dashboard" className="hover:text-[#4EA674] transition">Shop</Link>
-              <Link href="#" className="hover:text-[#4EA674] transition">Promotions</Link>
-              <Link href="/checkout" className="hover:text-[#4EA674] transition">Checkout</Link>
-              <Link href="/brands" className="hover:text-[#4EA674] transition">Brands</Link>
-            </div>
-
-            {/* Right side */}
-            <div className="flex flex-wrap gap-6">
-               <Link href="/" className="text-[#4EA674] border-b-2 border-[#4EA674] pb-0.5 transition">Home</Link>
-              <Link href="/about" className="hover:text-[#4EA674] transition">About Us</Link>
-              <Link href="/contact" className="hover:text-[#4EA674] transition">Contact Us</Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Category Bar */}
-      <div className="bg-white py-3 border-b">
-        <div className="container mx-auto px-4">
-          <nav className="flex flex-wrap justify-center md:justify-start gap-5 md:gap-8 text-xs md:text-sm font-medium text-gray-700 uppercase tracking-wide">
-            <Link href="#" className="hover:text-[#4EA674] transition">PV SOLAR PANELS</Link>
-            <Link href="#" className="hover:text-[#4EA674] transition">INVERTERS</Link>
-            <Link href="#" className="hover:text-[#4EA674] transition">BATTERIES</Link>
-            <Link href="#" className="hover:text-[#4EA674] transition">CHARGE CONTROLLERS</Link>
-            <Link href="#" className="hover:text-[#4EA674] transition">SOLAR WATER PUMPS</Link>
-            <Link href="#" className="hover:text-[#4EA674] transition">SOLAR PACKAGES</Link>
-            <Link href="#" className="hover:text-[#4EA674] transition">ACCESSORIES</Link>
-            <Link href="#" className="text-[#4EA674] hover:underline transition flex items-center gap-1">
-              See more
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          </nav>
-        </div>
-      </div>
-
       {/* ==================== HERO SECTION ==================== */}
       <section className="relative min-h-screen w-full">
         <Image src="/homebg.png" alt="Energy Independence" fill priority className="object-cover" />
@@ -131,7 +24,7 @@ export default function LandingPage() {
             <ChevronRight className="w-6 h-6 md:w-8 md:h-8 text-secondary group-hover:text-primary" />
           </button>
 
-          <h1 className="text-4xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl lg:text-6xl xl:text-6xl font-black text-white mb-6 leading-tight">
             Energy Independence Starts Here
           </h1>
           <p className="text-lg md:text-2xl lg:text-3xl text-white mb-10 font-medium max-w-4xl">
@@ -178,7 +71,7 @@ export default function LandingPage() {
           <div key={cat} className="relative rounded-3xl overflow-hidden shadow-xl group h-64 md:h-80 lg:h-96">
             {/* Image as background */}
             <Image
-              src="/offer.jpg"  // ← same or different image
+              src="/offer.jpg"  
               alt={cat}
               fill
               className="object-cover group-hover:scale-105 transition duration-700"
@@ -442,8 +335,8 @@ export default function LandingPage() {
           <Image
             src="/solarpanel.png"
             alt="Rilsopower Stabilizers Solar Panel"
-            width={500}          // ← smaller base width
-            height={500}          // ← adjusted aspect ratio
+            width={500}          
+            height={500}          
             className="object-contain drop-shadow-2xl mx-auto"
             priority
           />
@@ -552,11 +445,11 @@ export default function LandingPage() {
     </div>
 
     {/* RIGHT - AFRICICELL Hot Card */}
-    <div className="bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col">
+    <div className="bg-white rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col">
       {/* Top image */}
-      <div className="relative h-32 md:h-40">
+      <div className="relative h-35 md:h-40">
         <Image
-          src="/offer.jpg"  // ← replace with your actual product image
+          src="/offer.jpg"  
           alt="AFRICICELL 10KWH HY Wall Mounted"
           fill
           className="object-cover"
@@ -702,134 +595,6 @@ export default function LandingPage() {
   </div>
 </div>
 </div>
-      {/* ==================== FOOTER ==================== */}
-<footer className="bg-[#EAF8E7] pt-16 pb-12 border-t border-gray-200">
-  <div className="container mx-auto px-6 lg:px-8 max-w-7xl">
-    {/* Main columns grid */}
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-10 md:gap-12 mb-16">
-      {/* Column 1: Categories */}
-      <div>
-        <h4 className="font-bold text-lg mb-6 text-gray-800">Categories</h4>
-        <ul className="space-y-3 text-gray-600">
-          <li><a href="/categories/pv-solar-panels" className="hover:text-[#4EA674] transition">PV Solar Panels</a></li>
-          <li><a href="/categories/inverters" className="hover:text-[#4EA674] transition">Inverters</a></li>
-          <li><a href="/categories/batteries" className="hover:text-[#4EA674] transition">Batteries</a></li>
-          <li><a href="/categories/charge-controllers" className="hover:text-[#4EA674] transition">Charge Controllers</a></li>
-          <li><a href="/categories/solar-water-pumps" className="hover:text-[#4EA674] transition">Solar Water Pumps</a></li>
-          <li><a href="/categories" className="font-semibold hover:text-[#4EA674] transition">All Categories</a></li>
-        </ul>
-      </div>
-
-      {/* Column 2: Useful Links */}
-      <div>
-        <h4 className="font-bold text-lg mb-6 text-gray-800">Useful Links</h4>
-        <ul className="space-y-3 text-gray-600">
-          <li><a href="/contact" className="hover:text-[#4EA674] transition">Contact Us</a></li>
-          <li><a href="/delivery-return" className="hover:text-[#4EA674] transition">Delivery & Return</a></li>
-          <li><a href="/cart" className="hover:text-[#4EA674] transition">Cart</a></li>
-          <li><a href="/checkout" className="hover:text-[#4EA674] transition">Checkout</a></li>
-          <li><a href="/terms-conditions" className="hover:text-[#4EA674] transition">Terms & Conditions</a></li>
-        </ul>
-      </div>
-
-      {/* Column 3: Explore */}
-      <div>
-        <h4 className="font-bold text-lg mb-6 text-gray-800">Explore</h4>
-        <ul className="space-y-3 text-gray-600">
-          <li><a href="/brands" className="hover:text-[#4EA674] transition">Brands</a></li>
-          <li><a href="/new-arrivals" className="hover:text-[#4EA674] transition">New Arrivals</a></li>
-          <li><a href="/deals-promotions" className="hover:text-[#4EA674] transition">Deals & Promotions</a></li>
-        </ul>
-      </div>
-
-      {/* Column 4: Legal */}
-      <div>
-        <h4 className="font-bold text-lg mb-6 text-gray-800">Legal</h4>
-        <ul className="space-y-3 text-gray-600">
-          <li><a href="/delivery-return" className="hover:text-[#4EA674] transition">Delivery & Return</a></li>
-          <li><a href="/privacy-policy" className="hover:text-[#4EA674] transition">Privacy Policy</a></li>
-          <li><a href="/return-refund" className="hover:text-[#4EA674] transition">Return & Refund Policy</a></li>
-          <li><a href="/warranty-policy" className="hover:text-[#4EA674] transition">Warranty Policy</a></li>
-        </ul>
-      </div>
-
-      {/* Column 5: Location + Phone */}
-      <div>
-        <h4 className="font-bold text-lg mb-4 text-gray-800">Location</h4>
-        <p className="text-gray-600 leading-relaxed mb-6">
-          No. 5, OP Fingesi street, Utako, AMAC,<br />
-          Abuja, Nigeria.
-        </p>
-
-        <h4 className="font-bold text-lg mb-3 text-gray-800">Phone</h4>
-        <p className="text-xl font-bold text-[#4EA674]">
-          +234 0000 000 0000
-        </p>
-      </div>
-    </div>
-
-    {/* Bottom section: Logo + Newsletter + Social */}
-    <div className="border-t border-gray-200 pt-10">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-center">
-        {/* Logo - left */}
-        <div className="flex justify-center md:justify-start">
-          <Image
-            src="/logo.png"
-            alt="DEALPORT"
-            width={180}
-            height={60}
-            className="object-contain"
-          />
-        </div>
-</div>  
-        {/* Newsletter - center */}
-        <div className="text-center">
-  <p className="text-[#4EA674] font-bold text-lg mb-4">Newsletter Signup</p>
-  
-  <div className="inline-flex items-center bg-[#C1E6BA] rounded-full p-1.5 pl-6 pr-1.5 max-w-md mx-auto">
-    <input
-      type="email"
-      placeholder="Enter your email address"
-      className="bg-transparent text-white placeholder-[#333333] outline-none flex-1 min-w-[220px] px-2 py-2 text-sm"
-    />
-    <button
-      type="submit"
-      className="bg-white text-[#333333] font-medium px-6 py-2.5 rounded-full text-sm hover:bg-gray-100 transition ml-2"
-    >
-      Subscribe
-    </button>
-  </div>
-</div>
-{/* Social + Connect - right */}
-<div className="flex flex-col items-center md:items-end gap-3 md:gap-4">
-  {/* Text label on top */}
-  <p className="text-gray-700 font-semibold text-base md:text-lg">
-    Connect with us
-  </p>
-  <div className="flex gap-5">
-    <a href="#" target="_blank" rel="noopener noreferrer">
-      <Image src="/facebook.png" alt="Facebook" width={36} height={36} className="hover:opacity-80 hover:scale-110 transition duration-300" />
-    </a>
-    <a href="#" target="_blank" rel="noopener noreferrer">
-      <Image src="/instagram.png" alt="Instagram" width={36} height={36} className="hover:opacity-80 hover:scale-110 transition duration-300" />
-    </a>
-    <a href="#" target="_blank" rel="noopener noreferrer">
-      <Image src="/twitter.png" alt="X" width={36} height={36} className="hover:opacity-80 hover:scale-110 transition duration-300" />
-    </a>
-    <a href="#" target="_blank" rel="noopener noreferrer">
-      <Image src="/linkedin.png" alt="LinkedIn" width={36} height={36} className="hover:opacity-80 hover:scale-110 transition duration-300" />
-    </a>
-  </div>
-</div>
-      </div>
-
-    {/* Copyright */}
-    <div className="text-center md:text-left mt-10 text-gray-500 text-sm">
-      <p>© 2025 Dealport. All rights reserved.</p>
-    </div>
-  </div>
-  
-</footer>
     </main>
   );
 }

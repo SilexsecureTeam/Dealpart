@@ -5,25 +5,10 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import AdminSidebar from "@/components/Adminsidebar";
 import {
-  TrendingUp,
-  TrendingDown,
-  MoreVertical,
-  ChevronDown,
-  ChevronRight,
-  Search,
-  Bell,
-  Settings,
-  Sun,
-  Moon,
+  TrendingUp, TrendingDown, MoreVertical, ChevronDown, ChevronRight, Search, Bell, Settings, Sun, Moon,
 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 const weeklyData = [
@@ -193,7 +178,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <button className="w-full py-3 border border-[#646FF2] text-[#646FF2] rounded-full text-sm font-bold hover:bg-gradient-to-r hover:from-[#646FF2] hover:to-[#8B75F6] hover:text-white transition-all">
+              <button className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-gradient-to-r hover:from-[#646FF2] hover:to-[#8B75F6] hover:text-white transition-all">
                 Details
               </button>
             </div>
@@ -303,7 +288,7 @@ export default function AdminDashboard() {
 
           {/* Bottom Section */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left: Transaction + Best Selling */}
+            {/* Transaction + Best Selling */}
             <div className="lg:col-span-8 flex flex-col gap-8">
               {/* Transaction */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">

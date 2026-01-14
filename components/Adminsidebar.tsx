@@ -6,22 +6,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Package,
-  Users,
-  Tag,
-  Layers,
-  Receipt,
-  Star,
-  PlusCircle,
-  Image as ImageIcon,
-  List,
-  MessageSquare,
-  UserCog,
-  Shield,
-  ChevronRight,
-  Store,
-  Menu,
+  LayoutDashboard, Package, Users, Tag, Layers, Receipt, Star, PlusCircle,
+  Image as ImageIcon, List, MessageSquare, UserCog, Shield, ChevronRight, Store, Menu,
   X,
 } from "lucide-react";
 
@@ -71,7 +57,7 @@ export default function AdminSidebar() {
         </Link>
       </div>
 
-      {/* Navigation - takes remaining space */}
+      {/* Navigation  */}
       <nav className="flex-1 px-4 py-6 overflow-hidden">
         {/* Main menu */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-2">
@@ -155,7 +141,7 @@ export default function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* Bottom Section - fixed at bottom */}
+      {/* Bottom Section */}
       <div className="border-t border-gray-200 dark:border-gray-700 px-4 pt-5 pb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">

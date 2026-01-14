@@ -4,13 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Search, Bell, Settings, MoreVertical, MessageSquare, Trash2 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 const weeklyData = [
