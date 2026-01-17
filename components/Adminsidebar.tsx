@@ -1,4 +1,3 @@
-// src/components/Adminsidebar.tsx
 'use client';
 
 import { useState } from "react";
@@ -43,23 +42,8 @@ export default function AdminSidebar() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-8 py-7 border-b border-gray-200 dark:border-gray-700">
-        <Link href="/" className="flex items-center">
-          <Image
-            src="/logo.png"
-            alt="DEALPORT"
-            width={140}
-            height={40}
-            className="h-10 w-auto"
-            priority
-          />
-        </Link>
-      </div>
-
-      {/* Navigation  */}
-      <nav className="flex-1 px-4 py-6 overflow-hidden">
-        {/* Main menu */}
+      {/* Navigation - main content */}
+      <nav className="flex-1 px-4 py-6 overflow-y-auto">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-2">
           Main menu
         </p>
@@ -86,7 +70,6 @@ export default function AdminSidebar() {
           })}
         </ul>
 
-        {/* Product */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-2">
           Product
         </p>
@@ -113,7 +96,6 @@ export default function AdminSidebar() {
           })}
         </ul>
 
-        {/* Admin */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-2">
           Admin
         </p>
@@ -141,8 +123,8 @@ export default function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* Bottom Section */}
-      <div className="border-t border-gray-200 dark:border-gray-700 px-4 pt-5 pb-6">
+      {/* Bottom section - only on desktop */}
+      <div className="hidden lg:block border-t border-gray-200 dark:border-gray-700 px-4 pt-5 pb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
@@ -182,29 +164,64 @@ export default function AdminSidebar() {
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+        <div className="hidden lg:block px-8 py-7 border-b border-gray-200 dark:border-gray-700">
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="DEALPORT"
+              width={140}
+              height={40}
+              className="h-10 w-auto"
+              priority
+            />
+          </Link>
+        </div>
         <SidebarContent />
       </aside>
 
       {/* Mobile Drawer */}
-      <div className={`lg:hidden fixed inset-0 z-50 ${mobileOpen ? "block" : "hidden"}`}>
-        <div className="fixed inset-0 bg-black/50" onClick={toggleMobile} />
-        <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 shadow-2xl flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <Image src="/logo.png" alt="DEALPORT" width={120} height={34} className="h-9 w-auto" />
-            <button onClick={toggleMobile} className="p-2">
-              <X className="w-6 h-6 text-gray-600" />
-            </button>
-          </div>
-          <SidebarContent />
-        </div>
-      </div>
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={() => setMobileOpen(false)} 
+          />
+          <div className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl flex flex-col transform transition-transform duration-300">
+            {/* Mobile header - logo + close only */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <Image 
+                src="/logo.png" 
+                alt="DEALPORT" 
+                width={120} 
+                height={34} 
+                className="h-9 w-auto" 
+              />
+              <button 
+                onClick={() => setMobileOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="w-7 h-7 text-gray-700 dark:text-gray-300" />
+              </button>
+            </div>
 
-      {/* Mobile Menu Button */}
+            {/* Navigation */}
+            <div className="flex-1 overflow-y-auto">
+              <SidebarContent />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Hamburger Button */}
       <button
-        onClick={toggleMobile}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-transform active:scale-95"
       >
-        <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        {mobileOpen ? (
+          <X className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        ) : (
+          <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        )}
       </button>
     </>
   );

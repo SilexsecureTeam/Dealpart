@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Search, Bell, Settings, MoreVertical, Edit2, Link as LinkIcon,  Upload, Calendar, Eye, EyeOff } from "lucide-react";
+import { Search, Bell,Calendar, EyeOff, Eye, LinkIcon, Upload, MoreVertical, MessageSquare, Edit2, Trash2, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function AdminRolePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: "Wade",
@@ -23,35 +25,89 @@ export default function AdminRolePage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <>
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin role</h1>
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      {/* Updated Header - consistent across all admin pages */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Admin Role</h1>
+
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Mobile search toggle */}
+          <button 
+            className="p-2 md:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            onClick={() => setShowSearch(!showSearch)}
+            aria-label="Toggle search"
+          >
+            <Search className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          </button>
+
+          {/* Desktop search */}
           <div className="relative hidden md:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
               placeholder="Search data, users, or reports"
-              className="pl-12 pr-6 py-3.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm w-72 lg:w-96 focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
+              className="pl-12 pr-6 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm w-64 lg:w-96 focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
             />
           </div>
+
           <button className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
-            <Settings className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          </button>
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
+
+          {/* Dark mode toggle */}
+          {!mounted ? (
+            <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-700" />
+          ) : (
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              <Sun
+                className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
+                  theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+                }`}
+              />
+              <Moon
+                className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
+                  theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                }`}
+              />
+            </button>
+          )}
+
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
             <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
           </div>
         </div>
       </header>
 
-      <main className="p-6 lg:p-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">Admin role</h2>
+      {/* Mobile search dropdown */}
+      {showSearch && (
+        <div className="md:hidden px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search data, users, or reports"
+              className="w-full pl-12 pr-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
+              autoFocus
+            />
+          </div>
+        </div>
+      )}
+
+      <main className="p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">Admin Role</h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - About & Profile */}
@@ -326,6 +382,6 @@ export default function AdminRolePage() {
           </div>
         </div>
       </main>
-    </>
+    </div>
   );
 }

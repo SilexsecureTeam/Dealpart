@@ -2,49 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Your custom component classes using the extended theme */
+/* ============================================= */
+/*              Custom Animations                 */
+/* ============================================= */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slowZoom {
+  0% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1.12);
+  }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.7s ease-out forwards;
+}
+
+.animation-delay-200 { animation-delay: 0.2s; }
+/* Reusable animation utilities */
+.animate-fade-in-down {
+  animation: fadeInDown 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-slow-zoom {
+  animation: slowZoom 18s ease-in-out infinite alternate;
+}
+
+/* Delay helpers - use with animate-* classes */
+.animation-delay-200 { animation-delay: 0.2s; }
+.animation-delay-300 { animation-delay: 0.3s; }
+.animation-delay-400 { animation-delay: 0.4s; }
+.animation-delay-500 { animation-delay: 0.5s; }
+.animation-delay-600 { animation-delay: 0.6s; }
+
+/* ============================================= */
+/*               Component Classes                */
+/* ============================================= */
 @layer components {
+  /* Buttons */
   .btn-primary {
-    @apply bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-ambient transition-all;
+    @apply bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-ambient transition-all duration-300;
   }
 
   .btn-accent {
-    @apply bg-accent hover:bg-accent/90 text-secondary font-bold rounded-full shadow-ambient transition-all;
+    @apply bg-accent hover:bg-accent/90 text-secondary font-bold rounded-full shadow-ambient transition-all duration-300;
   }
 
   .btn-add-to-cart {
-    @apply bg-primary hover:bg-primary/90 text-white font-bold rounded-full px-8 py-5 shadow-ambient transition-all;
+    @apply bg-primary hover:bg-primary/90 text-white font-bold rounded-full px-7 sm:px-8 md:px-10 py-4 sm:py-5 shadow-ambient transition-all duration-300 hover:scale-102 active:scale-98;
   }
 
   .btn-view-details {
-    @apply text-primary font-bold hover:underline transition;
+    @apply text-primary font-bold hover:underline transition-colors duration-200;
   }
 
   .btn-view-details-white {
-    @apply bg-white hover:bg-gray-100 text-secondary font-bold rounded-full px-10 py-5 shadow-ambient transition-all;
+    @apply bg-white hover:bg-gray-100 text-secondary font-bold rounded-full px-8 sm:px-10 py-4 sm:py-5 shadow-ambient transition-all duration-300;
   }
 
   .btn-shop-now {
-    @apply bg-secondary hover:bg-secondary/90 text-white font-bold rounded-full px-12 py-6 text-xl shadow-ambient transition-all;
+    @apply bg-secondary hover:bg-secondary/90 text-white font-bold rounded-full px-8 sm:px-10 md:px-12 py-4 sm:py-5 md:py-6 text-lg sm:text-xl shadow-ambient transition-all duration-300 hover:scale-105;
   }
 
+  /* Badges & Cards */
   .badge-hot {
-    @apply absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-md z-10;
+    @apply absolute top-3 sm:top-4 left-3 sm:left-4 bg-red-600 text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-full shadow-md z-10;
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-card hover:shadow-ambient transition-shadow border-0;
+    @apply bg-white rounded-xl sm:rounded-2xl shadow-card hover:shadow-ambient transition-all duration-300;
   }
 
   .card-elevated {
-    @apply bg-white rounded-xl shadow-ambient hover:shadow-ambient-lg transition-shadow;
+    @apply bg-white rounded-xl sm:rounded-2xl shadow-ambient hover:shadow-ambient-lg transition-all duration-400 hover:-translate-y-1;
   }
 
+  /* Layout helpers */
   .section-py {
-    @apply py-24;
+    @apply py-16 sm:py-20 md:py-24 lg:py-28;
   }
 
   .container-max {
-    @apply max-w-7xl mx-auto px-6;
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Common hover lift effect for product cards */
+  .hover-lift {
+    @apply transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl;
   }
 }

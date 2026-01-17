@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Image from "next/image";
-import { Search, Bell, Settings, MoreVertical, MessageSquare, Trash2, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { Search, Bell, Settings, MoreVertical, Phone, MessageSquare, Trash2, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
 // Mock data for demonstration (in real app, fetch by id)
 const customer = {

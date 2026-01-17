@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { Search, Bell, Settings, Calendar, Upload, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import { Search, Bell, Settings, MoreVertical, Calendar, Edit2, Trash2, Sun, Moon, Plus } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function AddProductPage() {
   // Form states
@@ -20,12 +21,75 @@ export default function AddProductPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Images
-  const [images, setImages] = useState<string[]>(['/solarpanel.png']);
+  // Images + validation
+  const [images, setImages] = useState<string[]>([]);           // preview URLs
+  const [imageFiles, setImageFiles] = useState<File[]>([]);     // actual files
+  const [imageError, setImageError] = useState<string | null>(null);
 
-  // Validation errors
+  // General form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Mobile search
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Dark mode
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Image upload handler with full validation
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+
+    const newFiles = Array.from(e.target.files);
+    const totalAfter = images.length + newFiles.length;
+
+    // Max 5 images
+    if (totalAfter > 5) {
+      setImageError(`Maximum 5 images allowed (${5 - images.length} remaining)`);
+      return;
+    }
+
+    // Validate each file
+    for (const file of newFiles) {
+      // Allowed types
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+      if (!validTypes.includes(file.type)) {
+        setImageError('Only JPG, JPEG, PNG, WEBP, GIF files are allowed');
+        return;
+      }
+
+      // Max size 5MB
+      if (file.size > 5 * 1024 * 1024) {
+        setImageError('Each image must be less than 5MB');
+        return;
+      }
+    }
+
+    // Clear error if all good
+    setImageError(null);
+
+    // Create previews
+    const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+    setImages(prev => [...prev, ...newPreviews]);
+
+    // Store real files
+    setImageFiles(prev => [...prev, ...newFiles]);
+
+    // Reset input for next selection
+    e.target.value = '';
+  };
+
+  // Remove image
+  const handleRemoveImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Full form validation including images
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -75,13 +139,19 @@ export default function AddProductPage() {
       }
     }
 
+    // Image validation (required)
+    if (images.length === 0) {
+      newErrors.images = 'At least one product image is required';
+      setImageError('At least one image is required');
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handlePublish = () => {
     if (validateForm()) {
-      // Here would be your submit logic (API call, etc.)
+      // In real app: prepare FormData with imageFiles and send to API
       alert('Form is valid! Product would be published now.');
     } else {
       alert('Please fix the errors in the form.');
@@ -89,46 +159,81 @@ export default function AddProductPage() {
   };
 
   const handleSaveDraft = () => {
-    // Draft saving logic (can be less strict)
+    // Drafts can be saved without images
     alert('Draft saved!');
   };
 
-  const handleAddImage = () => {
-    setImages([...images, '/solarpanel.png']);
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
-
   return (
-    <>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add Product</h1>
-        <div className="flex items-center gap-4">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Add Product</h1>
+
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button 
+            className="p-2 md:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            onClick={() => setShowSearch(!showSearch)}
+            aria-label="Toggle search"
+          >
+            <Search className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          </button>
+
           <div className="relative hidden md:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search data, users, or reports"
-              className="pl-12 pr-6 py-3.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm w-72 lg:w-96 focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
+              placeholder="Search products..."
+              className="pl-12 pr-6 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm w-64 lg:w-96 focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
             />
           </div>
+
           <button className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
-            <Settings className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          </button>
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover" />
+
+          {!mounted ? (
+            <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-700" />
+          ) : (
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              <Sun
+                className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
+                  theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+                }`}
+              />
+              <Moon
+                className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
+                  theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                }`}
+              />
+            </button>
+          )}
+
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
+            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
           </div>
         </div>
       </header>
 
-      <main className="p-6 lg:p-8">
+      {showSearch && (
+        <div className="md:hidden px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              className="w-full pl-12 pr-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
+              autoFocus
+            />
+          </div>
+        </div>
+      )}
+
+      <main className="p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
         {/* Top Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Add New Product</h2>
@@ -192,14 +297,6 @@ export default function AddProductPage() {
                   {errors.description && (
                     <p className="mt-1 text-sm text-red-600">{errors.description}</p>
                   )}
-                  <div className="flex justify-end gap-3 mt-2">
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-                      <span className="text-gray-500">✎</span>
-                    </button>
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-                      <span className="text-gray-500">🔗</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -380,44 +477,59 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* Right Sidebar - Image + Categories */}
+          {/* Right Sidebar - Image Upload with Validation */}
           <div className="space-y-8">
-            {/* Upload Product Image */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Upload Product Image</h3>
 
               <div className="space-y-6">
+                {/* Main preview (first image) */}
                 {images.length > 0 && (
-                  <div className="relative rounded-xl overflow-hidden aspect-video">
+                  <div className="relative rounded-xl overflow-hidden aspect-video border border-gray-200 dark:border-gray-700">
                     <Image src={images[0]} alt="Main preview" fill className="object-cover" />
                   </div>
                 )}
 
+                {/* Thumbnails */}
                 <div className="flex flex-wrap gap-4">
                   {images.map((img, i) => (
                     <div key={i} className="relative w-24 h-24 group">
-                      <Image src={img} alt={`Thumb ${i}`} fill className="rounded-lg object-cover border" />
+                      <Image src={img} alt={`Thumbnail ${i + 1}`} fill className="rounded-lg object-cover border" />
                       <button
                         onClick={() => handleRemoveImage(i)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
 
-                  <button
-                    onClick={handleAddImage}
-                    className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center hover:border-[#4EA674]"
-                  >
-                    <Plus className="w-8 h-8 text-gray-400" />
-                  </button>
+                  {/* Upload button - only show if less than 5 */}
+                  {images.length < 5 && (
+                    <label className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-[#4EA674] cursor-pointer transition">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                        multiple
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      <Plus className="w-8 h-8 text-gray-400" />
+                    </label>
+                  )}
                 </div>
 
-                <div className="flex gap-4">
-                  <button className="flex-1 py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition">Browse</button>
-                  <button className="flex-1 py-3 border rounded-xl hover:bg-gray-50 transition">Replace</button>
-                </div>
+                {/* Image validation errors */}
+                {(imageError || errors.images) && (
+                  <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 p-3 rounded-lg">
+                    {imageError || errors.images}
+                  </p>
+                )}
+
+                {/* Help text */}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Supported: JPG, JPEG, PNG, WEBP, GIF • Max 5MB per image • Max 5 images
+                </p>
               </div>
             </div>
 
@@ -472,6 +584,6 @@ export default function AddProductPage() {
           </button>
         </div>
       </main>
-    </>
+    </div>
   );
 }

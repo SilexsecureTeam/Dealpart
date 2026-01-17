@@ -113,7 +113,7 @@ export default function InvertersPage() {
                 </p>
                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-auto items-center sm:items-stretch">
   <Link
-    href="/products/felicity-ivem"
+    href="/products//felicity-ivem6048-6kva-hybrid-inverter-48v"
     className="text-[#4EA674] text-xs sm:text-sm font-medium hover:underline text-center sm:text-left w-full sm:w-auto py-2 sm:py-0"
   >
     View Details

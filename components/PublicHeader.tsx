@@ -20,7 +20,7 @@ export default function PublicHeader() {
   return (
     <>
       {/* TOP BAR */}
-      <div className="bg-white py-3 shadow-sm">
+      <div className="bg-white py-3 border-b shadow-sm">
         <div className="container mx-auto px-4 flex flex-wrap items-center justify-between gap-4 md:gap-6">
           {/* Left */}
           <div className="flex items-center gap-5 md:gap-8 flex-wrap">
@@ -58,7 +58,7 @@ export default function PublicHeader() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             </div>
 
-            <Link href="/account" className="p-2 hover:bg-gray-100 rounded-full">
+            <Link href="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-full">
               <User className="w-6 h-6 text-gray-700" />
             </Link>
             <button className="p-2 hover:bg-gray-100 rounded-full">
