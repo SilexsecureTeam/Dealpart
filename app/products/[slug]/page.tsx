@@ -3,7 +3,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Eye, Package, Truck, ShieldCheck, Clock, ChevronRight, Star, Globe, Heart } from 'lucide-react';
 
-// Single definition of getProduct (no duplicates!)
 const getProduct = (slug: string) => {
   if (slug === 'felicity-ivem6048-6kva-hybrid-inverter-48v') {
     return {
@@ -513,7 +512,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   </div>
 </div>
 
-       {/* Recently Viewed / Similar Products - Compact Version */}
+       {/* Recently Viewed / Similar Products  */}
 <div className="max-w-7xl mx-auto mt-12">
   <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-5 sm:mb-6">
     Recently Viewed
