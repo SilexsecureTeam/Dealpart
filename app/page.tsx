@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Heart, Star, User,  Search, ShoppingCart, Ch
 export default function LandingPage() {
  return (
     <main className="min-h-screen bg-white">
-      {/* ==================== HERO SECTION ==================== */}
+    
       <section className="relative min-h-[70vh] w-full overflow-hidden">
   {/* Background image with subtle zoom animation */}
   <div className="absolute inset-0 animate-slow-zoom">
@@ -48,7 +48,7 @@ export default function LandingPage() {
     {/* Text content with responsive sizing + animations */}
     <h1
       className="
-        text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl
+        text-3xl sm:text-3xl md:text-5xl lg:text-6xl xl:text-7xl
         font-black text-white mb-4 sm:mb-6 md:mb-8
         leading-tight tracking-tight
         animate-fade-in-down
@@ -59,7 +59,7 @@ export default function LandingPage() {
 
     <p
       className="
-        text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl
+        text-base sm:text-sm md:text-xl lg:text-2xl xl:text-3xl
         text-white/95 font-medium mb-8 md:mb-10 lg:mb-12
         max-w-3xl mx-auto
         animate-fade-in-up animation-delay-300
@@ -189,64 +189,120 @@ export default function LandingPage() {
   </div>
 </section>
 
-    {/* TOP OFFERS */}
+
 {/* TOP OFFERS */}
 <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-white">
   <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-    {/* Title + View All button in one row */}
+    {/* Title + View All */}
     <div className="flex items-center justify-between mb-8 md:mb-12">
       <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-secondary">
         The Best Offers
       </h2>
       <button className="px-5 sm:px-6 py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm sm:text-base font-medium hover:bg-[#4EA674] hover:text-white transition">
-        View All →
+        View All 
       </button>
     </div>
 
-    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-7 lg:gap-8">
-      {Array(4).fill(0).map((_, i) => (
-        <div
-          key={i}
-          className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-        >
-          <div className="relative h-48 sm:h-56 md:h-64 lg:h-72">
-            <Image
-              src="/offer.jpg"
-              alt="Product"
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-            <button className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition">
-              <Heart className="w-5 h-5 text-secondary" />
-            </button>
-          </div>
+    {(() => {
+      const products = [
+        {
+          id: 1,
+          name: "Apex $50W Monocrystalline Panel",
+          teaser: "Upgrade your energy storage with high-efficiency Apex panels...",
+          price: "₦29.99",
+          rating: 5,
+          stock: "In stock",
+          image: "/offer.jpg", 
+        },
+        {
+          id: 2,
+          name: "Lithium LiFePO4 Battery 12V / 100Ah",
+          teaser: "Upgrade your energy storage with safe, long-life lithium technology...",
+          price: "₦40.99",
+          rating: 5,
+          stock: "Only 4 units left",
+          image: "/offer.jpg",
+        },
+        {
+          id: 3,
+          name: "Solar Motion Sensor Light (24z)",
+          teaser: "Upgrade your energy storage with smart, energy-saving motion lighting...",
+          price: "₦119.99",
+          rating: 5,
+          stock: "In stock",
+          image: "/offer.jpg",
+        },
+        {
+          id: 4,
+          name: "MPPT Charge Controller 60A",
+          teaser: "Upgrade your energy storage with maximum power point tracking efficiency...",
+          price: "₦119.99",
+          rating: 5,
+          stock: "In stock",
+          image: "/offer.jpg",
+        },
+      ];
 
-          <div className="p-4 sm:p-5 lg:p-6">
-            <h3 className="font-bold text-base sm:text-lg lg:text-xl mb-2 line-clamp-2 text-secondary">
-              Product Name Here
-            </h3>
-            <div className="flex mb-2">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 fill-yellow-400 text-yellow-400" />
-              ))}
-            </div>
-            <p className="text-sm font-bold text-green-600 mb-3">In stock</p>
-            <p className="text-xl sm:text-2xl lg:text-2.5xl font-black text-primary mb-5">
-              ₦999,000
-            </p>
+      return (
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-7 lg:gap-8">
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="relative h-48 sm:h-56 md:h-64 lg:h-72">
+                <Image
+                  src={product.image}
+                  alt={product.name}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <button className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition">
+                  <Heart className="w-5 h-5 text-secondary" />
+                </button>
+              </div>
 
-            <div className="flex gap-2 sm:gap-3">
-              <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2.5 sm:py-3 rounded-full font-medium text-sm sm:text-base hover:bg-[#4EA674] hover:text-white transition">
-                Details
-              </button>
-              <button className="flex-1 bg-[#4EA674] text-white py-2.5 sm:py-3 rounded-full font-medium text-sm sm:text-base hover:bg-[#3D8B59] transition">
-                Add to Cart
-              </button>
+              <div className="p-4 sm:p-5 lg:p-6">
+                <h3 className="font-bold text-base sm:text-lg lg:text-xl mb-1 line-clamp-2 text-secondary">
+                  {product.name}
+                </h3>
+
+                {/* Ttext  */}
+                <p className="text-sm text-gray-600 mb-2 line-clamp-1">
+                  {product.teaser}
+                </p>
+
+                <div className="flex mb-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${i < product.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                    />
+                  ))}
+                </div>
+
+                <p className={`text-sm font-bold mb-3 ${product.stock.includes("left") ? "text-red-600" : "text-green-600"}`}>
+                  {product.stock}
+                </p>
+
+                <p className="text-xl sm:text-2xl lg:text-2.5xl font-black text-primary mb-5">
+                  {product.price}
+                </p>
+
+                <div className="flex gap-2 sm:gap-3">
+                  <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2.5 sm:py-3 rounded-full font-medium text-sm sm:text-base hover:bg-[#4EA674] hover:text-white transition">
+                    View Details
+                  </button>
+                  <button className="flex-1 bg-[#4EA674] text-white py-2.5 sm:py-3 rounded-full font-medium text-sm sm:text-base hover:bg-[#3D8B59] transition">
+                    Add to Cart
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
-      ))}
-    </div>
+      );
+    })()}
   </div>
 </section>
 
@@ -288,7 +344,6 @@ export default function LandingPage() {
     </div>
   </div>
 </section>
-
 {/* NEW ARRIVALS */}
 <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-white">
   <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -297,78 +352,147 @@ export default function LandingPage() {
         New Arrivals
       </h2>
       <button className="px-5 sm:px-6 py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm sm:text-base font-medium hover:bg-[#4EA674] hover:text-white transition">
-        View All →
+        View All 
       </button>
     </div>
 
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8">
-      {/* Featured gradient card */}
-      <div className="bg-gradient-to-br from-[#EAF8E7] to-[#21C45D] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden">
-        <div className="p-5 sm:p-6 md:p-8 flex flex-col flex-grow">
-          <h3 className="font-bold text-base sm:text-lg md:text-xl text-gray-900 mb-2 line-clamp-2">
-            Apex 50W Monocrystalline Panel
-          </h3>
-          <p className="text-sm sm:text-base text-gray-700 mb-4 line-clamp-3">
-            This is a brief product description...
-          </p>
-          <div className="mt-auto relative h-48 sm:h-56 md:h-64">
-            <Image src="/solarpanel.png" alt="Featured" fill className="object-contain p-6" />
-          </div>
-        </div>
-        <button className="m-4 sm:m-5 bg-white text-[#4EA674] py-3 rounded-full font-bold hover:bg-[#3D8B59] hover:text-white transition text-sm sm:text-base">
-          Shop Now
-        </button>
-      </div>
+      {(() => {
+        const products = [
+          {
+            id: 1,
+            isFeatured: true,
+            name: "Apex $50W Monocrystalline Panel",
+            description: "High-efficiency, Durable.",
+            price: "₦29.99",
+            rating: 5,
+            stock: "In stock", 
+            image: "/solarpanel.png", 
+            hot: false,
+          },
+          {
+            id: 2,
+            name: "Lithium LiFePO4 Battery 12V / 100Ah",
+            description: "Upgrade your energy storage with safe, long-cycle lithium technology for reliable power backup.",
+            price: "₦40.99",
+            rating: 5,
+            stock: "In stock",
+            image: "/offer.jpg",
+            hot: true,
+          },
+          {
+            id: 3,
+            name: "Solar Motion Sensor Light (24z)",
+            description: "Upgrade your energy storage with smart motion-activated LED lighting for security and efficiency.",
+            price: "₦119.99",
+            rating: 5,
+            stock: "In stock",
+            image: "/offer.jpg",
+            hot: true,
+          },
+          {
+            id: 4,
+            name: "MPPT Charge Controller 60A",
+            description: "Upgrade your energy storage with advanced MPPT tracking for maximum solar power conversion.",
+            price: "₦119.99",
+            rating: 5,
+            stock: "In stock",
+            image: "/offer.jpg",
+            hot: true,
+          },
+        ];
 
-      {/* Regular cards */}
-      {Array(3).fill(0).map((_, i) => (
-        <div
-          key={i}
-          className="bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden"
-        >
-          <div className="flex items-center justify-between p-4 sm:p-5">
-            <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs sm:text-sm font-bold uppercase">
-              Hot
-            </span>
-            <button className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition">
-              <Heart className="w-5 h-5 text-gray-700" />
-            </button>
-          </div>
-
-          <div className="relative mt-auto h-48 sm:h-56 md:h-64">
-            <Image src="/offer.jpg" alt="Product" fill className="object-contain p-6" />
-          </div>
-
-          <div className="p-5 sm:p-6 md:p-8 flex flex-col flex-grow">
-            <h3 className="font-bold text-base sm:text-lg md:text-xl text-gray-900 mb-2 line-clamp-2">
-              Product Title Here
-            </h3>
-            <p className="text-sm sm:text-base text-gray-600 mb-4 line-clamp-3">
-              Short product description...
-            </p>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex gap-0.5">
-                {[...Array(5)].map((_, s) => (
-                  <Star key={s} className="w-4 h-4 sm:w-5 sm:h-5 fill-yellow-400 text-yellow-400" />
-                ))}
+        return products.map((product) => {
+          if (product.isFeatured) {
+            return (
+              <div
+                key={product.id}
+                className="bg-gradient-to-br from-[#EAF8E7] to-[#21C45D] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden"
+              >
+                <div className="p-4 sm:p-5 md:p-6 lg:p-8 flex flex-col flex-grow">
+                  <h3 className="font-bold text-lg sm:text-xl md:text-2xl text-gray-900 mb-2 line-clamp-2">
+                    {product.name}
+                  </h3>
+                  <p className="text-sm sm:text-base text-gray-700 mb-4 line-clamp-3">
+                    {product.description}
+                  </p>
+                  <div className="mt-auto relative aspect-[4/3] sm:aspect-[3/2] md:aspect-square">
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      className="object-contain p-4 sm:p-6 md:p-8"
+                    />
+                  </div>
+                </div>
+                <button className="m-4 sm:m-5 bg-white text-[#4EA674] py-3 rounded-full font-bold hover:bg-[#3D8B59] hover:text-white transition text-sm sm:text-base">
+                  Shop Now
+                </button>
               </div>
-              <span className="text-sm font-bold text-green-600">In stock</span>
-            </div>
-            <p className="text-xl sm:text-2xl lg:text-2.5xl font-black text-[#4EA674] mb-5">
-              ₦119,999
-            </p>
+            );
+          }
 
-            <div className="flex gap-2 sm:gap-3">
-              <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-bold hover:bg-[#4EA674] hover:text-white transition">
-                Details
-              </button>
-              <button className="flex-1 bg-[#4EA674] text-white py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-bold hover:bg-[#3D8B59] transition">
-                Cart
-              </button>
+          // Regular cards
+          return (
+            <div
+              key={product.id}
+              className="bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-3 sm:p-4">
+                {product.hot && (
+                  <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs sm:text-sm font-bold uppercase">
+                    Hot
+                  </span>
+                )}
+                <button className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition">
+                  <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+                </button>
+              </div>
+
+              <div className="relative aspect-[4/3] sm:aspect-[3/2] md:aspect-square">
+                <Image
+                  src={product.image}
+                  alt={product.name}
+                  fill
+                  className="object-contain p-4 sm:p-6 md:p-8"
+                />
+              </div>
+
+              <div className="p-4 sm:p-5 md:p-6 flex flex-col flex-grow">
+                <h3 className="font-bold text-base sm:text-lg md:text-xl text-gray-900 mb-1.5 line-clamp-2">
+                  {product.name}
+                </h3>
+                <p className="text-xs sm:text-sm md:text-base text-gray-600 mb-3 line-clamp-3">
+                  {product.description}
+                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, s) => (
+                      <Star
+                        key={s}
+                        className={`w-4 h-4 sm:w-5 sm:h-5 ${s < product.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-green-600">{product.stock}</span>
+                </div>
+                <p className="text-xl sm:text-2xl md:text-2.5xl font-black text-[#4EA674] mb-4">
+                  {product.price}
+                </p>
+
+                <div className="flex gap-2">
+                  <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2.5 rounded-full text-sm sm:text-base font-bold hover:bg-[#4EA674] hover:text-white transition">
+                    View Details
+                  </button>
+                  <button className="flex-1 bg-[#4EA674] text-white py-2.5 rounded-full text-sm sm:text-base font-bold hover:bg-[#3D8B59] transition">
+                    Add to Cart
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      ))}
+          );
+        });
+      })()}
     </div>
   </div>
 </section>
@@ -456,99 +580,95 @@ export default function LandingPage() {
 {/* ===  INVERTER BATTERIES PROMO + 3 BATTERY CARDS === */}
 {/* ================================================ */}
 
-<div className="container mx-auto px-4 py-16 lg:py-30">
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+<div className="container mx-auto px-4 py-12 md:py-16 lg:py-20 xl:py-24">
+  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 xl:gap-10">
     
-    {/* LEFT - Large Inverter Batteries Banner */}
-    <div className="relative rounded-xl overflow-hidden w- h-[300px] md:h-[400px] lg:h-[500px] bg-gradient-to-br from-[#0A3A3A] via-[#1A4D4D] to-[#000000] shadow-2xl">
+    {/* LEFT - Wide Inverter Batteries Banner – spans 3 or 4 columns on lg+ */}
+    <div className="lg:col-span-3 xl:col-span-4 relative rounded-xl lg:rounded-xl xl:rounded-2xl overflow-hidden h-80 sm:h-96 md:h-[420px] lg:h-[500px] xl:h-[560px] group shadow-2xl order-2 lg:order-1">
       
-      {/* Dark teal to black gradient background */}
+      {/* Gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0D4A4A]/95 via-[#062828]/90 to-[#000000]" />
 
-      {/* Solar Panel Image - positioned left and tilted */}
-      <div className="absolute left-0 top-[35%] md:top-[50%] lg:top-[30%] -translate-y-1/2 w-3/5 md:w-1/2">
-        <div className="relative transform -rotate-12 scale-110">
+      {/* Solar Panel Image - positioned left and tilted  */}
+      <div className="absolute left-0 sm:left-4 md:left-8 lg:left-12 top-1/2 -translate-y-1/2 w-4/5 sm:w-3/5 md:w-1/2 lg:w-5/12 xl:w-2/5">
+        <div className="relative transform -rotate-12 scale-105 sm:scale-110 md:scale-115 lg:scale-120">
           <Image
             src="/solarpanel.png"
             alt="Inverter Batteries Solar Panel"
-            width={600}
-            height={600}
+            width={800}
+            height={800}
             priority
             className="object-contain drop-shadow-2xl"
           />
         </div>
       </div>
 
-      {/* Text content - center-right */}
-      <div className="absolute inset-0 flex items-center justify-end pr-8 md:pr-12 lg:pr-16">
-        <div className="text-right max-w-xl">
-          <h2 className="text-3xl md:text-4xl lg:text-4xl font-black italic text-white mb-3 md:mb-4 leading-tight drop-shadow-2xl">
+      {/* Text content - right-aligned, takes advantage of wider space */}
+      <div className="absolute inset-0 flex items-center justify-end pr-6 sm:pr-10 md:pr-12 lg:pr-16 xl:pr-20">
+        <div className="text-right max-w-md lg:max-w-lg xl:max-w-xl">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-black italic text-white mb-4 md:mb-6 drop-shadow-2xl">
             Inverter Batteries
           </h2>
-          <p className="text-base md:text-sm lg:text-sm text-white font-normal leading-relaxed drop-shadow-lg">
+          <p className="text-base sm:text-lg md:text-xl lg:text-xl xl:text-2xl text-white/90 font-medium leading-relaxed drop-shadow-lg">
             Power When You Need It Most: Inverter Batteries for Your Solar System
           </p>
         </div>
       </div>
     </div>
-  <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col max-w-sm">
-  {/* Top image */}
-  <div className="relative h-48 md:h-56">
-    <Image
-      src="/offer.jpg"  
-      alt="AFRICELL (10KWH)HY Wall Mounted"
-      fill
-      className="object-cover"
-    />
 
-    {/* Hot badge - top left */}
-    <div className="absolute top-4 left-4 bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold">
-      Hot
+    {/* RIGHT - Narrow Product Card  */}
+    <div className="lg:col-span-2 xl:col-span-1 bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col order-1 lg:order-2 max-w-md lg:max-w-none mx-auto lg:mx-0">
+      {/* Top image */}
+      <div className="relative h-48 md:h-56 lg:h-64 xl:h-72">
+        <Image
+          src="/offer.jpg"
+          alt="AFRICELL (10KWH)HY Wall Mounted"
+          fill
+          className="object-cover"
+        />
+
+        {/* Hot badge - top left */}
+        <div className="absolute top-4 left-4 bg-red-600 text-white px-5 py-1.5 rounded-full text-sm font-bold uppercase shadow-md">
+          Hot
+        </div>
+
+        {/* Heart icon - top right */}
+        <button className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:bg-gray-50 transition">
+          <Heart className="w-5 h-5 text-gray-700" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-5 sm:p-6 flex flex-col flex-grow">
+        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 leading-tight">
+          AFRICELL (10KWH)HY Wall Mounted
+        </h3>
+        
+        <p className="text-sm text-gray-500 uppercase tracking-wide mb-3">
+          LITHIUM BATTERY
+        </p>
+
+        <div className="flex items-center gap-1 mb-4">
+          {[...Array(5)].map((_, i) => (  // made 5 stars for full rating look
+            <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 fill-yellow-400 text-yellow-400" />
+          ))}
+          <span className="ml-3 text-sm sm:text-base text-gray-600 font-medium">In stock</span>
+        </div>
+
+        <p className="text-2xl sm:text-3xl font-bold text-[#4EA674] mb-6">
+          ₦1,700,000.00
+        </p>
+
+        <div className="mt-auto flex items-center gap-4 sm:gap-6">
+          <button className="flex-1 text-[#4EA674] font-semibold text-base rounded-full sm:text-md hover:bg-[#034449]">
+            View Details
+          </button>
+          <button className="flex-1 bg-[#023337] text-white py-3 rounded-full font-bold hover:bg-[#034449] transition text-sm sm:text-base shadow-md">
+            Add to cart
+          </button>
+        </div>
+      </div>
     </div>
-
-    {/* Heart icon - top right */}
-    <button className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:bg-gray-50 transition">
-      <Heart className="w-5 h-5 text-gray-700" />
-    </button>
-  </div>
-
-  {/* Content */}
-  <div className="p-5 flex flex-col flex-grow">
-    {/* Product Title */}
-    <h3 className="text-xl font-bold text-gray-900 mb-1 leading-tight">
-      AFRICELL (10KWH)HY Wall Mounted
-    </h3>
-    
-    {/* Product Category */}
-    <p className="text-sm text-gray-500 uppercase tracking-wide mb-3">
-      LITHIUM BATTERY
-    </p>
-
-    {/* Rating + Stock Status */}
-    <div className="flex items-center gap-1 mb-4">
-      {[...Array(4)].map((_, i) => (
-        <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-      ))}
-      <Star className="w-4 h-4 text-yellow-400" />
-      <span className="ml-2 text-sm text-gray-600">In stock</span>
-    </div>
-
-    {/* Price */}
-    <p className="text-2xl font-bold text-[#4EA674] mb-5">
-      ₦1,700,000.00
-    </p>
-
-    {/* Buttons */}
-    <div className="mt-auto flex items-center gap-3">
-      <button className="text-[#4EA674] font-semiboldtransition text-xl">
-        View Details
-      </button>
-      <button className="flex-1 bg-[#023337] text-white py-3 rounded-full font-bold hover:bg-[#034449] transition text-sm">
-        Add to cart
-      </button>
-    </div>
-  </div>
-</div>
   </div>
 
 {/* BOTTOM - 3 Full-width Battery Type Cards */}
@@ -556,11 +676,11 @@ export default function LandingPage() {
   {/* Dry Cell */}
   <div className="relative rounded-xl overflow-hidden h-96 group shadow-2xl bg-red-600">
     {/* Solid red background */}
-    <div className="absolute inset-0 bg-gradient-radial from-[#CA0808] via-[#B00707] to-[#7D0707]" />
+    <div className="absolute inset-0 bg-gradient-to-r from-[#7D0707] via-[#B00707] to-[#CA0808]" />
 
     {/* Image on RIGHT */}
     <div className="absolute inset-0 flex items-center justify-end pr-10 md:pr-16">
-      <div className="relative w-3/5 md:w-1/2 h-full">
+      <div className="relative w-1/2 sm:w-5/12 md:w-2/5 lg:w-1/3 h-4/5 sm:h-5/6">
         <Image
           src="/solarpanel.png" 
           alt="Dry Cell Batteries"
@@ -588,10 +708,10 @@ export default function LandingPage() {
 
   {/* Gel */}
   <div className="relative rounded-3xl overflow-hidden h-96 group shadow-2xl bg-yellow-500">
-    <div className="absolute inset-0 bg-yellow-500" />
+    <div className="absolute inset-0 bg-gradient-to-r from-[#ECCB0F] via-[#E6C000] to-[#FBBD23]" />
 
     <div className="absolute inset-0 flex items-center justify-end pr-10 md:pr-16">
-      <div className="relative w-3/5 md:w-1/2 h-full">
+      <div className="relative w-1/2 sm:w-5/12 md:w-2/5 lg:w-1/3 h-4/5 sm:h-5/6">
         <Image
           src="/solarpanel.png"
           alt="Gel Batteries"
@@ -609,7 +729,7 @@ export default function LandingPage() {
         <p className="text-xl md:text-2xl text-white/90 font-medium mb-8">
           Gel Batteries
         </p>
-        <button className="px-10 py-5 bg-white text-yellow-700 font-bold rounded-full hover:bg-gray-100 transition text-lg">
+        <button className="px-5 py-5 bg-white text-yellow-700 font-bold rounded-full hover:bg-gray-100 transition text-lg">
           View Details
         </button>
       </div>
@@ -617,11 +737,11 @@ export default function LandingPage() {
   </div>
 
   {/* Tubular */}
-  <div className="relative rounded-3xl overflow-hidden h-96 group shadow-2xl bg-green-800">
-    <div className="absolute inset-0 bg-green-800" />
+  <div className="relative rounded-2xl overflow-hidden h-96 group shadow-2xl bg-green-800">
+    <div className="absolute inset-0 bg-gradient-to-r from-[#000000]  to-[#023337]" />
 
     <div className="absolute inset-0 flex items-center justify-end pr-10 md:pr-16">
-      <div className="relative w-3/5 md:w-1/2 h-full">
+      <div className="relative w-1/2 sm:w-5/12 md:w-2/5 lg:w-1/3 h-4/5 sm:h-5/6">
         <Image
           src="/solarpanel.png"
           alt="Tubular Batteries"
@@ -633,13 +753,13 @@ export default function LandingPage() {
 
     <div className="relative z-10 h-full flex items-center pl-10 md:pl-16">
       <div className="text-left max-w-[55%]">
-        <h3 className="text-4xl md:text-4xl font-black text-white mb-4 drop-shadow-lg">
+        <h3 className="text-4xl md:text-3xl font-black text-white mb-4 drop-shadow-lg">
           Tubular
         </h3>
         <p className="text-xl md:text-2xl text-white/90 font-medium mb-8">
           Tubular Batteries
         </p>
-        <button className="px-10 py-5 bg-white text-green-800 font-bold rounded-full hover:bg-gray-100 transition text-lg">
+        <button className="px-5 py-5 bg-white text-green-800 font-bold rounded-full hover:bg-gray-100 transition text-lg">
           View Details
         </button>
       </div>

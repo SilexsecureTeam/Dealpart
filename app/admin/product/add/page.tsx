@@ -6,6 +6,7 @@ import { Search, Bell, Settings, MoreVertical, Calendar, Edit2, Trash2, Sun, Moo
 import { useTheme } from "next-themes";
 
 export default function AddProductPage() {
+  const [currency, setCurrency] = useState("US");
   // Form states
   const [productName, setProductName] = useState('Lithium LifePO4Battery 12 / 100Ah');
   const [description, setDescription] = useState(
@@ -151,7 +152,7 @@ export default function AddProductPage() {
 
   const handlePublish = () => {
     if (validateForm()) {
-      // In real app: prepare FormData with imageFiles and send to API
+    
       alert('Form is valid! Product would be published now.');
     } else {
       alert('Please fix the errors in the form.');
@@ -159,7 +160,6 @@ export default function AddProductPage() {
   };
 
   const handleSaveDraft = () => {
-    // Drafts can be saved without images
     alert('Draft saved!');
   };
 
@@ -318,10 +318,17 @@ export default function AddProductPage() {
                         errors.price ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}
                     />
-                    <select className="absolute right-4 top-1/2 -translate-y-1/2 bg-transparent text-sm text-gray-600">
-                      <option>NGN</option>
-                      <option>USD</option>
-                    </select>
+  <select
+  value={currency}
+  onChange={(e) => setCurrency(e.target.value)}
+  className="absolute right-0 top-0 bottom-0 w-16 sm:w-20 bg-transparent text-2xl cursor-pointer appearance-none px-3 focus:outline-none"
+>
+  <option value="NGN">🇳🇬</option>
+  <option value="US">🇺🇸</option>
+  <option value="EU">🇪🇺</option>
+  <option value="GB">🇬🇧</option>
+  
+</select>
                   </div>
                   {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
                 </div>
