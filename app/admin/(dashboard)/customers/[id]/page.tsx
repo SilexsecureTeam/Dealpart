@@ -208,7 +208,7 @@ export default function CustomerDetailsPage() {
                 </div>
 
                 <button className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                  Next →
+                  Next
                 </button>
               </div>
             </div>

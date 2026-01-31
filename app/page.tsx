@@ -24,7 +24,7 @@ export default function LandingPage() {
 
   {/* Content */}
   <div className="relative z-10 container mx-auto h-[70vh] min-h-[500px] flex flex-col justify-center items-center text-center px-5 sm:px-8 md:px-12">
-    {/* Navigation arrows - better mobile sizing */}
+    
     <button
       onClick={() => console.log("Prev")}
       className="absolute left-3 sm:left-6 md:left-10 top-1/2 -translate-y-1/2 

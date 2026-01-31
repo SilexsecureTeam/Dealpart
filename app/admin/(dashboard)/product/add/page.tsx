@@ -1,12 +1,39 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 import Image from "next/image";
-import { Search, Bell, Settings, MoreVertical, Calendar, Edit2, Trash2, Sun, Moon, Plus } from "lucide-react";
+import {
+  Search,
+  Bell,
+  Settings,
+  MoreVertical,
+  Calendar,
+  Edit2,
+  Trash2,
+  Sun,
+  Moon,
+  Plus,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
+type Category = {
+  id: number;
+  name: string;
+  description: string | null;
+  image: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  tag_id: number | null;
+};
+
 export default function AddProductPage() {
+  const BASE_URL = "https://admin.bezalelsolar.com";
+  const PRODUCTS_URL = `${BASE_URL}/api/products`;
+  const CATEGORIES_URL = `${BASE_URL}/api/categories`;
+
   const [currency, setCurrency] = useState("US");
+
   // Form states
   const [productName, setProductName] = useState('Lithium LifePO4Battery 12 / 100Ah');
   const [description, setDescription] = useState(
@@ -22,13 +49,21 @@ export default function AddProductPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Categories dropdown
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState<string>(""); // keep as string for select
+  const [catLoading, setCatLoading] = useState(false);
+
   // Images + validation
-  const [images, setImages] = useState<string[]>([]);           // preview URLs
-  const [imageFiles, setImageFiles] = useState<File[]>([]);     // actual files
+  const [images, setImages] = useState<string[]>([]);       // preview URLs
+  const [imageFiles, setImageFiles] = useState<File[]>([]); // actual files
   const [imageError, setImageError] = useState<string | null>(null);
 
   // General form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Request state
+  const [submitting, setSubmitting] = useState(false);
 
   // Mobile search
   const [showSearch, setShowSearch] = useState(false);
@@ -37,12 +72,30 @@ export default function AddProductPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  async function fetchCategories() {
+    setCatLoading(true);
+    try {
+      const res = await fetch(CATEGORIES_URL, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      const json = (await res.json().catch(() => ([]))) as Category[] | any;
+      if (!res.ok) return;
+
+      const list = Array.isArray(json) ? (json as Category[]) : (json?.data as Category[]) || [];
+      setCategories(list);
+    } finally {
+      setCatLoading(false);
+    }
+  }
+
   useEffect(() => {
     setMounted(true);
+    fetchCategories();
   }, []);
 
   // Image upload handler with full validation
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
 
     const newFiles = Array.from(e.target.files);
@@ -56,7 +109,6 @@ export default function AddProductPage() {
 
     // Validate each file
     for (const file of newFiles) {
-      // Allowed types
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
       if (!validTypes.includes(file.type)) {
         setImageError('Only JPG, JPEG, PNG, WEBP, GIF files are allowed');
@@ -70,17 +122,12 @@ export default function AddProductPage() {
       }
     }
 
-    // Clear error if all good
     setImageError(null);
 
-    // Create previews
     const newPreviews = newFiles.map(file => URL.createObjectURL(file));
     setImages(prev => [...prev, ...newPreviews]);
-
-    // Store real files
     setImageFiles(prev => [...prev, ...newFiles]);
 
-    // Reset input for next selection
     e.target.value = '';
   };
 
@@ -150,15 +197,76 @@ export default function AddProductPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handlePublish = () => {
-    if (validateForm()) {
-    
-      alert('Form is valid! Product would be published now.');
-    } else {
+  // ✅ CREATE PRODUCT with images[0], images[1], ...
+  const handlePublish = async () => {
+    if (!validateForm()) {
       alert('Please fix the errors in the form.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+
+      // confirmed keys from your API response
+      fd.append("name", productName);
+      fd.append("description", description);
+
+      // backend returned sale_price_inc_tax in your test
+      fd.append("sale_price_inc_tax", price);
+
+      // optional: if backend supports it, keep (won't break if ignored)
+      if (discountedPrice.trim()) fd.append("sale_price", discountedPrice);
+
+      // optional fields (send only if you want; backend may ignore unknown keys)
+      // Inventory
+      // fd.append("stock_status", stockStatus);
+      if (!unlimitedStock && stockQuantity.trim()) fd.append("stock_quantity", stockQuantity);
+
+      // Flags
+      fd.append("customize", "true"); // backend showed customize: true
+      fd.append("is_variable_price", "false"); // backend showed false
+      fd.append("tax_exempt_eligible", "false"); // backend showed false
+
+      // Category (if selected)
+      if (categoryId) fd.append("category_id", categoryId);
+
+      // Images: indexed keys (your backend expects images[0])
+      imageFiles.forEach((file, idx) => {
+        fd.append(`images[${idx}]`, file);
+      });
+
+      const res = await fetch(PRODUCTS_URL, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          // DON'T set Content-Type when sending FormData
+        },
+        body: fd,
+      });
+
+      const json = await res.json().catch(() => ({} as any));
+
+      if (!res.ok) {
+        const firstError =
+          json?.errors &&
+          Object.values(json.errors)?.[0] &&
+          (Object.values(json.errors)[0] as any)?.[0];
+
+        alert(firstError || json?.message || "Product creation failed.");
+        return;
+      }
+
+      alert(json?.message || "Product created successfully!");
+      // If you want to reset the form later, we can add that—left untouched for now.
+    } catch (e: any) {
+      alert(e?.message || "Network error creating product.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // No draft endpoint yet — keep UI behavior unchanged
   const handleSaveDraft = () => {
     alert('Draft saved!');
   };
@@ -170,10 +278,11 @@ export default function AddProductPage() {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Add Product</h1>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <button 
+          <button
             className="p-2 md:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
             onClick={() => setShowSearch(!showSearch)}
             aria-label="Toggle search"
+            type="button"
           >
             <Search className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
@@ -187,7 +296,7 @@ export default function AddProductPage() {
             />
           </div>
 
-          <button className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
+          <button className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl" type="button">
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
@@ -199,6 +308,7 @@ export default function AddProductPage() {
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               aria-label="Toggle dark mode"
+              type="button"
             >
               <Sun
                 className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
@@ -248,13 +358,17 @@ export default function AddProductPage() {
             </div>
             <button
               onClick={handlePublish}
-              className="px-6 py-3 bg-[#4EA674] text-white rounded-xl font-medium hover:bg-[#3D8B59] transition"
+              disabled={submitting}
+              className="px-6 py-3 bg-[#4EA674] text-white rounded-xl font-medium hover:bg-[#3D8B59] transition disabled:opacity-50"
+              type="button"
             >
-              Publish Product
+              {submitting ? "Publishing..." : "Publish Product"}
             </button>
             <button
               onClick={handleSaveDraft}
-              className="px-6 py-3 border border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674] hover:text-white transition"
+              disabled={submitting}
+              className="px-6 py-3 border border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674] hover:text-white transition disabled:opacity-50"
+              type="button"
             >
               Save to draft
             </button>
@@ -318,17 +432,16 @@ export default function AddProductPage() {
                         errors.price ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}
                     />
-  <select
-  value={currency}
-  onChange={(e) => setCurrency(e.target.value)}
-  className="absolute right-0 top-0 bottom-0 w-16 sm:w-20 bg-transparent text-2xl cursor-pointer appearance-none px-3 focus:outline-none"
->
-  <option value="NGN">🇳🇬</option>
-  <option value="US">🇺🇸</option>
-  <option value="EU">🇪🇺</option>
-  <option value="GB">🇬🇧</option>
-  
-</select>
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="absolute right-0 top-0 bottom-0 w-16 sm:w-20 bg-transparent text-2xl cursor-pointer appearance-none px-3 focus:outline-none"
+                    >
+                      <option value="NGN">🇳🇬</option>
+                      <option value="US">🇺🇸</option>
+                      <option value="EU">🇪🇺</option>
+                      <option value="GB">🇬🇧</option>
+                    </select>
                   </div>
                   {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
                 </div>
@@ -490,14 +603,12 @@ export default function AddProductPage() {
               <h3 className="text-xl font-bold mb-6">Upload Product Image</h3>
 
               <div className="space-y-6">
-                {/* Main preview (first image) */}
                 {images.length > 0 && (
                   <div className="relative rounded-xl overflow-hidden aspect-video border border-gray-200 dark:border-gray-700">
                     <Image src={images[0]} alt="Main preview" fill className="object-cover" />
                   </div>
                 )}
 
-                {/* Thumbnails */}
                 <div className="flex flex-wrap gap-4">
                   {images.map((img, i) => (
                     <div key={i} className="relative w-24 h-24 group">
@@ -505,13 +616,13 @@ export default function AddProductPage() {
                       <button
                         onClick={() => handleRemoveImage(i)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition"
+                        type="button"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
 
-                  {/* Upload button - only show if less than 5 */}
                   {images.length < 5 && (
                     <label className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-[#4EA674] cursor-pointer transition">
                       <input
@@ -526,14 +637,12 @@ export default function AddProductPage() {
                   )}
                 </div>
 
-                {/* Image validation errors */}
                 {(imageError || errors.images) && (
                   <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 p-3 rounded-lg">
                     {imageError || errors.images}
                   </p>
                 )}
 
-                {/* Help text */}
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Supported: JPG, JPEG, PNG, WEBP, GIF • Max 5MB per image • Max 5 images
                 </p>
@@ -546,15 +655,32 @@ export default function AddProductPage() {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Categories</label>
-                  <select className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-                    <option>Select your product</option>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg"
+                    disabled={catLoading}
+                  >
+                    <option value="">
+                      {catLoading ? "Loading categories..." : "Select your category"}
+                    </option>
+                    {categories
+                      .filter((c) => c.is_active === 1)
+                      .map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Tag</label>
-                  <select className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-                    <option>Select your product</option>
+                  <select
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg opacity-60 cursor-not-allowed"
+                    disabled
+                  >
+                    <option>Tag endpoint not available yet</option>
                   </select>
                 </div>
 
@@ -566,6 +692,7 @@ export default function AddProductPage() {
                         key={i}
                         className="w-10 h-10 rounded-full border-2 border-gray-200 hover:scale-110 transition"
                         style={{ backgroundColor: c }}
+                        type="button"
                       />
                     ))}
                   </div>
@@ -579,15 +706,19 @@ export default function AddProductPage() {
         <div className="flex justify-end gap-4 mt-12">
           <button
             onClick={handleSaveDraft}
-            className="px-8 py-3.5 border border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674] hover:text-white transition"
+            disabled={submitting}
+            className="px-8 py-3.5 border border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674] hover:text-white transition disabled:opacity-50"
+            type="button"
           >
             Save to draft
           </button>
           <button
             onClick={handlePublish}
-            className="px-8 py-3.5 bg-[#4EA674] text-white rounded-xl font-medium hover:bg-[#3D8B59] transition"
+            disabled={submitting}
+            className="px-8 py-3.5 bg-[#4EA674] text-white rounded-xl font-medium hover:bg-[#3D8B59] transition disabled:opacity-50"
+            type="button"
           >
-            Publish Product
+            {submitting ? "Publishing..." : "Publish Product"}
           </button>
         </div>
       </main>

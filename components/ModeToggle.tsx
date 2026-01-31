@@ -16,9 +16,7 @@ export function ModeToggle() {
   // Prevent render on server / during hydration
   if (!mounted) {
     return (
-      // Optional: placeholder with same size to avoid layout shift
       <div className="inline-flex h-9 w-9 items-center justify-center rounded-full p-2" />
-      // or just → return null
     )
   }
 

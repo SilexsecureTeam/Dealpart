@@ -37,7 +37,7 @@ const weeklyData = [
   { day: "Sat", visitors: 26000 },
 ];
 
-// Customer data (repeated enough to have ~24 pages when itemsPerPage = 10)
+
 const baseCustomers = [
   { id: "CUST001", name: "John Doe", phone: "+1234567890", orders: 25, spend: "3,450.00", status: "Active" },
   { id: "CUST002", name: "Jane Smith", phone: "+1234567890", orders: 5, spend: "250.00", status: "Inactive" },
@@ -47,7 +47,8 @@ const baseCustomers = [
 const customers = Array(80).fill(null).flatMap((_, blockIndex) =>
   baseCustomers.map((cust, i) => ({
     ...cust,
-    id: `CUST${String(blockIndex * 10 + i + 1).padStart(3, '0')}`,
+    id: `CUST${String(blockIndex * baseCustomers.length + i + 1).padStart(3, "0")}`,
+
   }))
 );
 
