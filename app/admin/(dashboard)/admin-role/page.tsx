@@ -38,33 +38,28 @@ type ProfileResponse = {
 };
 
 export default function AdminRolePage() {
-  // ===== API CONFIG (confirmed working) =====
   const BASE_URL = "https://admin.bezalelsolar.com";
   const PROFILE_URL = `${BASE_URL}/api/admin/profile`;
   const UPDATE_PROFILE_URL = `${BASE_URL}/api/admin/profile`;
   const UPDATE_PASSWORD_URL = `${BASE_URL}/api/admin/profile/password`;
   const UPLOAD_AVATAR_URL = `${BASE_URL}/api/admin/profile/avatar`;
 
-  // ===== THEME =====
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // ===== UI STATE =====
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  // ===== MESSAGES/LOADERS =====
   const [profileMsg, setProfileMsg] = useState<Msg>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
-  // ===== AVATAR =====
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("/man.png");
 
-  // ===== PROFILE FORM DATA =====
   const [formData, setFormData] = useState({
     firstName: "Wade",
     lastName: "Warren",
@@ -75,9 +70,9 @@ export default function AdminRolePage() {
     password: "********",
     confirmPassword: "",
     bio: "",
+    creditCard: "843-4359-4444",
   });
 
-  // ===== PASSWORD CHANGE =====
   const [pwd, setPwd] = useState({
     current_password: "",
     password: "",
@@ -86,7 +81,6 @@ export default function AdminRolePage() {
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdMsg, setPwdMsg] = useState<Msg>(null);
 
-  // ===== helpers =====
   function getTokenOrThrow() {
     const token = localStorage.getItem("adminToken");
     if (!token) throw new Error("Admin session missing. Please login again.");
@@ -94,19 +88,17 @@ export default function AdminRolePage() {
   }
 
   function resolveAvatar(url: string | null) {
-    console.log("Resolving avatar URL:", url);
-  if (!url || url.trim() === "") return "/man.png";
-  
-  if (!url.startsWith("https://")) return "/man.png";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    if (!url || url.trim() === "") return "/man.png";
+    const u = url.trim();
+    if (u.startsWith("blob:")) return u;
+    if (u.startsWith("http://") || u.startsWith("https://")) return u;
+    const clean = u.startsWith("/") ? u.slice(1) : u;
+    return `${BASE_URL}/${clean}`;
+  }
 
-  const clean = url.startsWith("/") ? url.slice(1) : url;
-
-  if (clean.startsWith("storage/")) return `${BASE_URL}/${clean}`;
-
-  return `${BASE_URL}/storage/${clean}`;
-}
-
+  function bust(url: string) {
+    return `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+  }
 
   function splitName(fullName: string) {
     const parts = fullName.trim().split(" ").filter(Boolean);
@@ -124,7 +116,6 @@ export default function AdminRolePage() {
     }
   }
 
-  // ===== API: GET PROFILE =====
   async function fetchProfile() {
     setProfileMsg(null);
     setProfileLoading(true);
@@ -138,14 +129,14 @@ export default function AdminRolePage() {
         },
       });
 
-      const json = (await res.json().catch(() => ({}))) as Partial<ProfileResponse>;
-
       if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
         setProfileMsg({ type: "error", text: (json as any)?.message || "Failed to load profile." });
         return;
       }
 
-      const u = (json as ProfileResponse).data;
+      const json = await res.json() as ProfileResponse;
+      const u = json.data;
 
       const fullName = u?.name || "";
       const { first, last } = splitName(fullName);
@@ -161,13 +152,13 @@ export default function AdminRolePage() {
         bio: u?.bio ?? prev.bio ?? "",
         password: "********",
       }));
-if (u?.avatar && u.avatar.trim() !== "") {
-  console.log("Setting avatar from profile data:", u.avatar);
-  const newUrl = resolveAvatar(u.avatar);
-  setAvatarUrl(newUrl);
-  localStorage.setItem("adminAvatarUrl", newUrl);
-}
 
+      // ────────────────────────────────────────────────
+      // AVATAR UPDATE REMOVED HERE ON PURPOSE
+      // We no longer let the profile endpoint overwrite avatar
+      // (it returns outdated value after upload)
+      // Avatar is now only controlled by upload/delete + localStorage
+      // ────────────────────────────────────────────────
 
       localStorage.setItem("adminUser", JSON.stringify(u));
     } catch (e: any) {
@@ -177,7 +168,6 @@ if (u?.avatar && u.avatar.trim() !== "") {
     }
   }
 
-  // ===== API: PATCH PROFILE UPDATE =====
   async function handleSaveProfile() {
     setProfileMsg(null);
     setProfileSaving(true);
@@ -201,22 +191,15 @@ if (u?.avatar && u.avatar.trim() !== "") {
         }),
       });
 
-      const json = await res.json().catch(() => ({} as any));
+      const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const firstError =
-          json?.errors &&
-          Object.values(json.errors)?.[0] &&
-          (Object.values(json.errors)[0] as any)?.[0];
-
+        const firstError = json?.errors && Object.values(json.errors)?.[0]?.[0];
         setProfileMsg({ type: "error", text: firstError || json?.message || "Profile update failed." });
         return;
       }
 
-     setProfileMsg({ type: "success", text: json?.message || "Avatar uploaded successfully." });
-setTimeout(() => {
-  fetchProfile();
-}, 800);
-
+      setProfileMsg({ type: "success", text: json?.message || "Profile updated successfully." });
+      setTimeout(() => fetchProfile(), 800);
     } catch (e: any) {
       setProfileMsg({ type: "error", text: e?.message || "Network error updating profile." });
     } finally {
@@ -224,13 +207,13 @@ setTimeout(() => {
     }
   }
 
-  // ===== API: UPLOAD AVATAR =====
   async function uploadAvatar(file: File) {
     setProfileMsg(null);
     setAvatarUploading(true);
 
     const previewUrl = URL.createObjectURL(file);
     setAvatarUrl(previewUrl);
+    console.log("Preview set:", previewUrl);
 
     try {
       const token = getTokenOrThrow();
@@ -246,37 +229,41 @@ setTimeout(() => {
         body: fd,
       });
 
-      const json = await res.json().catch(() => ({} as any));
-      if (!res.ok) {
-        const firstError =
-          json?.errors &&
-          Object.values(json.errors)?.[0] &&
-          (Object.values(json.errors)[0] as any)?.[0];
+      const json = await res.json().catch(() => ({}));
+      console.log("Upload response:", json);
 
+      if (!res.ok) {
+        const firstError = json?.errors && Object.values(json.errors)?.[0]?.[0];
         const lastSaved = localStorage.getItem("adminAvatarUrl");
         setAvatarUrl(lastSaved || "/man.png");
-
         setProfileMsg({ type: "error", text: firstError || json?.message || "Avatar upload failed." });
         return;
       }
 
-      console.log("Upload response:", json);
-      localStorage.setItem("adminAvatarUrl", previewUrl);
+      const possibleAvatar =
+        json?.avatar_url ||
+        json?.data?.avatar ||
+        json?.avatar ||
+        json?.data?.url ||
+        json?.url ||
+        null;
 
-     const possibleAvatar =
-  json?.avatar_url || json?.data?.avatar || json?.avatar || json?.data?.url || json?.url || null;
+      console.log("Extracted avatar:", possibleAvatar);
 
-if (possibleAvatar) {
-  console.log("Resolved avatar URL from upload response:", possibleAvatar);
-  const serverUrl = resolveAvatar(String(possibleAvatar));
-  setAvatarUrl(serverUrl);
-  localStorage.setItem("adminAvatarUrl", serverUrl);
-}
-
+      if (possibleAvatar) {
+        const serverUrl = resolveAvatar(String(possibleAvatar));
+        const finalUrl = bust(serverUrl);
+        console.log("Setting new avatar URL:", finalUrl);
+        setAvatarUrl(finalUrl);
+        localStorage.setItem("adminAvatarUrl", finalUrl);
+      }
 
       setProfileMsg({ type: "success", text: json?.message || "Avatar uploaded successfully." });
-      await fetchProfile();
+
+      // No fetchProfile() here — we don't want to overwrite avatar
+
     } catch (e: any) {
+      console.error("Upload error:", e);
       const lastSaved = localStorage.getItem("adminAvatarUrl");
       setAvatarUrl(lastSaved || "/man.png");
       setProfileMsg({ type: "error", text: e?.message || "Network error uploading avatar." });
@@ -292,7 +279,6 @@ if (possibleAvatar) {
     setTimeout(() => setProfileMsg(null), 1200);
   }
 
-  // ===== API: UPDATE PASSWORD =====
   async function handleUpdatePassword() {
     setPwdMsg(null);
     setPwdLoading(true);
@@ -318,16 +304,10 @@ if (possibleAvatar) {
         body: JSON.stringify(pwd),
       });
 
-      const json = await res.json().catch(() => ({} as any));
+      const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const firstError =
-          json?.errors &&
-          Object.values(json.errors)?.[0] &&
-          (Object.values(json.errors)[0] as any)?.[0];
-        setPwdMsg({
-          type: "error",
-          text: firstError || json?.message || "Password update failed.",
-        });
+        const firstError = json?.errors && Object.values(json.errors)?.[0]?.[0];
+        setPwdMsg({ type: "error", text: firstError || json?.message || "Password update failed." });
         return;
       }
 
@@ -340,15 +320,24 @@ if (possibleAvatar) {
     }
   }
 
-  // ===== INIT =====
   useEffect(() => {
     setMounted(true);
     const savedAvatar = localStorage.getItem("adminAvatarUrl");
     if (savedAvatar) setAvatarUrl(savedAvatar);
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+
+  const AvatarImg = ({ className }: { className: string }) => (
+    <img
+      src={avatarUrl}
+      alt="Admin"
+      className={className}
+      onError={() => setAvatarUrl("/man.png")}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
@@ -358,7 +347,6 @@ if (possibleAvatar) {
           Admin role
         </h1>
 
-        {/* ✅ added flex-wrap + min-w-0 to stop overflow on small screens */}
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 min-w-0">
           <button
             className="p-2 md:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
@@ -406,19 +394,11 @@ if (possibleAvatar) {
           )}
 
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600 flex-shrink-0">
-            <Image
-              src={avatarUrl}
-              alt="Admin"
-              width={40}
-              height={40}
-              unoptimized
-              className="object-cover w-full h-full"
-            />
+            <AvatarImg className="object-cover w-full h-full" />
           </div>
         </div>
       </header>
 
-      {/* Mobile search dropdown */}
       {showSearch && (
         <div className="md:hidden px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="relative">
@@ -433,7 +413,6 @@ if (possibleAvatar) {
         </div>
       )}
 
-      {/* ✅ added overflow-x-hidden to prevent tiny horizontal scroll on mobile */}
       <main className="p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950 overflow-x-hidden">
         {(profileLoading || profileSaving || avatarUploading) && (
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
@@ -496,13 +475,11 @@ if (possibleAvatar) {
 
               <div className="flex flex-col items-center text-center">
                 <div className="w-28 h-28 rounded-full overflow-hidden mb-4 ring-4 ring-gray-100 dark:ring-gray-700">
-                  <Image
+                  <img
                     src={avatarUrl}
                     alt="Profile"
-                    width={112}
-                    height={112}
-                    unoptimized
                     className="object-cover w-full h-full"
+                    onError={() => setAvatarUrl("/man.png")}
                   />
                 </div>
 
@@ -510,7 +487,6 @@ if (possibleAvatar) {
                   {fullName || "Admin"}
                 </h4>
 
-                {/* ✅ added min-w-0 + break/truncate support */}
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 min-w-0">
                   <span className="truncate max-w-[220px] sm:max-w-none">{formData.email}</span>
                   <button
@@ -585,15 +561,19 @@ if (possibleAvatar) {
                   </label>
                   <div className="relative">
                     <input
-                      type="password"
+                      type={showNewPassword ? "text" : "password"}
                       placeholder="Enter password"
                       value={pwd.password}
                       onChange={(e) => setPwd((p) => ({ ...p, password: e.target.value }))}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
                     />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Eye className="w-5 h-5" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-300"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                   </div>
                 </div>
 
@@ -658,7 +638,6 @@ if (possibleAvatar) {
                 </button>
               </div>
 
-              {/* ✅ allow wrap on small screens */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-8">
                 <div className="relative">
                   <div className="w-14 h-14 rounded-full overflow-hidden ring-4 ring-gray-100 dark:ring-gray-700">
@@ -699,7 +678,6 @@ if (possibleAvatar) {
                   </label>
                   <input
                     type="text"
-                    name="firstName"
                     value={formData.firstName}
                     onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
@@ -712,7 +690,6 @@ if (possibleAvatar) {
                   </label>
                   <input
                     type="text"
-                    name="lastName"
                     value={formData.lastName}
                     onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
@@ -726,7 +703,6 @@ if (possibleAvatar) {
                   <div className="relative">
                     <input
                       type="password"
-                      name="password"
                       value={formData.password}
                       readOnly
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none"
@@ -744,7 +720,6 @@ if (possibleAvatar) {
                   <div className="flex items-center gap-3 min-w-0">
                     <input
                       type="text"
-                      name="phone"
                       value={formData.phone}
                       onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
                       className="flex-1 min-w-0 px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
@@ -762,7 +737,6 @@ if (possibleAvatar) {
                   </label>
                   <input
                     type="email"
-                    name="email"
                     value={formData.email}
                     readOnly
                     className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-200 cursor-not-allowed"
@@ -776,7 +750,6 @@ if (possibleAvatar) {
                   <div className="relative">
                     <input
                       type="date"
-                      name="dob"
                       value={formData.dob}
                       onChange={(e) => setFormData((p) => ({ ...p, dob: e.target.value }))}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
@@ -791,7 +764,6 @@ if (possibleAvatar) {
                   </label>
                   <input
                     type="text"
-                    name="location"
                     value={formData.location}
                     onChange={(e) => setFormData((p) => ({ ...p, location: e.target.value }))}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
@@ -809,7 +781,8 @@ if (possibleAvatar) {
                     </div>
                     <input
                       type="text"
-                      defaultValue="843-4359-4444"
+                      value={formData.creditCard}
+                      onChange={(e) => setFormData((p) => ({ ...p, creditCard: e.target.value }))}
                       className="w-full pl-20 pr-10 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
                     />
                     <select className="absolute right-4 top-1/2 -translate-y-1/2 bg-transparent text-sm text-gray-600 dark:text-gray-200">
@@ -825,7 +798,6 @@ if (possibleAvatar) {
                   </label>
                   <div className="relative">
                     <textarea
-                      name="bio"
                       value={formData.bio}
                       onChange={(e) => setFormData((p) => ({ ...p, bio: e.target.value }))}
                       placeholder="Enter a biography about you"

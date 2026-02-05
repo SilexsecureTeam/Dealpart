@@ -68,10 +68,25 @@ export default function AddProductPage() {
   // Mobile search
   const [showSearch, setShowSearch] = useState(false);
 
+  // Page message
+  const [pageMsg, setPageMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   // Dark mode
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  function getTokenOrThrow() {
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("adminToken");
+
+  if (!token) {
+    throw new Error("Admin session missing. Please login again.");
+  }
+
+  return token;
+}
+  // Fetch categories for dropdown
   async function fetchCategories() {
     setCatLoading(true);
     try {
@@ -142,25 +157,16 @@ export default function AddProductPage() {
     const newErrors: Record<string, string> = {};
 
     // Product Name
-    if (!productName.trim()) {
-      newErrors.productName = 'Product name is required';
-    } else if (productName.trim().length < 5) {
-      newErrors.productName = 'Product name must be at least 5 characters';
-    }
+    if (!productName.trim()) newErrors.productName = 'Product name is required';
+    else if (productName.trim().length < 5) newErrors.productName = 'Product name must be at least 5 characters';
 
     // Description
-    if (!description.trim()) {
-      newErrors.description = 'Product description is required';
-    } else if (description.trim().length < 20) {
-      newErrors.description = 'Description should be at least 20 characters';
-    }
+    if (!description.trim()) newErrors.description = 'Product description is required';
+    else if (description.trim().length < 20) newErrors.description = 'Description should be at least 20 characters';
 
     // Price
-    if (!price.trim()) {
-      newErrors.price = 'Product price is required';
-    } else if (isNaN(Number(price)) || Number(price) <= 0) {
-      newErrors.price = 'Price must be a positive number';
-    }
+    if (!price.trim()) newErrors.price = 'Product price is required';
+    else if (isNaN(Number(price)) || Number(price) <= 0) newErrors.price = 'Price must be a positive number';
 
     // Discounted Price (optional)
     if (discountedPrice.trim() && !isNaN(Number(discountedPrice))) {
@@ -171,9 +177,8 @@ export default function AddProductPage() {
 
     // Stock Quantity when not unlimited
     if (!unlimitedStock) {
-      if (!stockQuantity.trim()) {
-        newErrors.stockQuantity = 'Stock quantity is required';
-      } else if (!/^\d+$/.test(stockQuantity) || Number(stockQuantity) <= 0) {
+      if (!stockQuantity.trim()) newErrors.stockQuantity = 'Stock quantity is required';
+      else if (!/^\d+$/.test(stockQuantity) || Number(stockQuantity) <= 0) {
         newErrors.stockQuantity = 'Must be a positive whole number';
       }
     }
@@ -182,9 +187,7 @@ export default function AddProductPage() {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      if (end < start) {
-        newErrors.endDate = 'End date must be after start date';
-      }
+      if (end < start) newErrors.endDate = 'End date must be after start date';
     }
 
     // Image validation (required)
@@ -197,15 +200,19 @@ export default function AddProductPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ CREATE PRODUCT with images[0], images[1], ...
+  // ✅ CREATE PRODUCT with images[0], images[1], ... + Authorization
   const handlePublish = async () => {
+    setPageMsg(null);
+
     if (!validateForm()) {
-      alert('Please fix the errors in the form.');
+      setPageMsg({ type: "error", text: "Please fix the errors in the form." });
       return;
     }
 
     setSubmitting(true);
     try {
+      const token = getTokenOrThrow();
+
       const fd = new FormData();
 
       // confirmed keys from your API response
@@ -215,23 +222,16 @@ export default function AddProductPage() {
       // backend returned sale_price_inc_tax in your test
       fd.append("sale_price_inc_tax", price);
 
-      // optional: if backend supports it, keep (won't break if ignored)
+      // optional
       if (discountedPrice.trim()) fd.append("sale_price", discountedPrice);
 
-      // optional fields (send only if you want; backend may ignore unknown keys)
-      // Inventory
-      // fd.append("stock_status", stockStatus);
-      if (!unlimitedStock && stockQuantity.trim()) fd.append("stock_quantity", stockQuantity);
-
-      // Flags
-      fd.append("customize", "true"); // backend showed customize: true
-      fd.append("is_variable_price", "false"); // backend showed false
-      fd.append("tax_exempt_eligible", "false"); // backend showed false
-
-      // Category (if selected)
+      // category (if selected)
       if (categoryId) fd.append("category_id", categoryId);
 
-      // Images: indexed keys (your backend expects images[0])
+      // optional stock quantity
+      if (!unlimitedStock && stockQuantity.trim()) fd.append("stock_quantity", stockQuantity);
+
+      // images indexed keys (backend expects images[0])
       imageFiles.forEach((file, idx) => {
         fd.append(`images[${idx}]`, file);
       });
@@ -240,7 +240,8 @@ export default function AddProductPage() {
         method: "POST",
         headers: {
           Accept: "application/json",
-          // DON'T set Content-Type when sending FormData
+          Authorization: `Bearer ${token}`,
+          // DON'T set Content-Type for FormData
         },
         body: fd,
       });
@@ -253,22 +254,20 @@ export default function AddProductPage() {
           Object.values(json.errors)?.[0] &&
           (Object.values(json.errors)[0] as any)?.[0];
 
-        alert(firstError || json?.message || "Product creation failed.");
+        setPageMsg({ type: "error", text: firstError || json?.message || "Unauthenticated / Product creation failed." });
         return;
       }
 
-      alert(json?.message || "Product created successfully!");
-      // If you want to reset the form later, we can add that—left untouched for now.
+      setPageMsg({ type: "success", text: json?.message || "Product created successfully!" });
     } catch (e: any) {
-      alert(e?.message || "Network error creating product.");
+      setPageMsg({ type: "error", text: e?.message || "Network error creating product." });
     } finally {
       setSubmitting(false);
     }
   };
 
-  // No draft endpoint yet — keep UI behavior unchanged
   const handleSaveDraft = () => {
-    alert('Draft saved!');
+    setPageMsg({ type: "success", text: "Draft saved!" });
   };
 
   return (

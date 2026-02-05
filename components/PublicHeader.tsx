@@ -1,8 +1,8 @@
 // src/components/PublicHeader.tsx
-'use client';
+"use client";
 
-import Link from 'next/link';
-import Image from 'next/image';
+import Link from "next/link";
+import Image from "next/image";
 import {
   ChevronDown,
   MapPin,
@@ -11,11 +11,68 @@ import {
   Heart,
   ShoppingCart,
   ChevronRight,
-} from 'lucide-react';
-import { useState } from 'react';
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { clearUserSession, isUserLoggedIn } from "@/lib/userAuth";
+import { getCart, calcCartSummary, onCartUpdated } from "@/lib/cart";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function PublicHeader() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // cart UI
+  const [cartCount, setCartCount] = useState(0);
+  const [cartTotal, setCartTotal] = useState(0);
+
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const nextParam = encodeURIComponent(pathname || "/");
+
+  // --- auth check ---
+  useEffect(() => {
+    const checkAuth = () => setIsLoggedIn(isUserLoggedIn());
+    checkAuth();
+
+    // if other tabs update localStorage
+    window.addEventListener("storage", checkAuth);
+    return () => window.removeEventListener("storage", checkAuth);
+  }, []);
+
+  // --- cart refresh ---
+  async function refreshCart() {
+    const res = await getCart();
+    const items = Array.isArray(res?.data) ? res.data : [];
+    const { count, total } = calcCartSummary(items);
+    setCartCount(count);
+    setCartTotal(total);
+  }
+
+  useEffect(() => {
+    refreshCart();
+    const off = onCartUpdated(() => refreshCart());
+    return () => off();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // close menu when clicking outside
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  function logout() {
+    clearUserSession();
+    setIsLoggedIn(false);
+    setUserMenuOpen(false);
+    router.push(`/login?next=${encodeURIComponent("/")}`);
+  }
 
   return (
     <>
@@ -35,7 +92,7 @@ export default function PublicHeader() {
             </Link>
 
             <button className="flex items-center gap-2 text-sm text-gray-700 hover:text-[#4EA674]">
-              <Image src="/ng.png" alt="Nigeria" width={20} height={14} className="rounded" />
+              <Image src="/ng.png" alt="Nigeria" width={20} height={14} className="" />
               EN
               <ChevronDown className="w-4 h-4" />
             </button>
@@ -58,16 +115,74 @@ export default function PublicHeader() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             </div>
 
-            <Link href="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-full">
-              <User className="w-6 h-6 text-gray-700" />
-            </Link>
+            {/* USER ICON: login or dropdown */}
+            {!isLoggedIn ? (
+              <Link
+                href={`/login?next=${nextParam}`}
+                className="p-2 hover:bg-gray-100 rounded-full"
+                title="Login"
+              >
+                <User className="w-6 h-6 text-gray-700" />
+              </Link>
+            ) : (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setUserMenuOpen((s) => !s)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                  title="Account"
+                >
+                  <User className="w-6 h-6 text-gray-700" />
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-44 bg-white border rounded-xl shadow-lg overflow-hidden z-50">
+                    <Link
+                      href="/account"
+                      className="block px-4 py-3 text-sm hover:bg-gray-50"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      My Account
+                    </Link>
+                    <Link
+                      href="/orders"
+                      className="block px-4 py-3 text-sm hover:bg-gray-50"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      Orders
+                    </Link>
+                    <button
+                      onClick={logout}
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 text-red-600"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button className="p-2 hover:bg-gray-100 rounded-full">
               <Heart className="w-6 h-6 text-gray-700" />
             </button>
-            <button className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full">
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
-              <span className="font-bold text-sm text-gray-700">₦0.00</span>
-            </button>
+
+            <Link
+              href="/cart"
+              className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full"
+              title="Cart"
+            >
+              <div className="relative">
+                <ShoppingCart className="w-6 h-6 text-gray-700" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 text-[10px] font-bold text-white bg-[#4EA674] rounded-full px-1.5 py-0.5">
+                    {cartCount}
+                  </span>
+                )}
+              </div>
+
+              <span className="font-bold text-sm text-gray-700">
+                ₦{Number(cartTotal || 0).toLocaleString()}
+              </span>
+            </Link>
           </div>
         </div>
       </div>
@@ -91,18 +206,30 @@ export default function PublicHeader() {
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap justify-center md:justify-between gap-6 text-sm font-medium text-gray-700">
             <div className="flex flex-wrap gap-6">
-              <Link href="/shop" className="hover:text-[#4EA674]">Shop</Link>
-              <Link href="/promotions" className="hover:text-[#4EA674]">Promotions</Link>
-              <Link href="/checkout" className="hover:text-[#4EA674]">Checkout</Link>
-              <Link href="/brands" className="hover:text-[#4EA674]">Brands</Link>
+              <Link href="/shop" className="hover:text-[#4EA674]">
+                Shop
+              </Link>
+              <Link href="/promotions" className="hover:text-[#4EA674]">
+                Promotions
+              </Link>
+              <Link href="/checkout" className="hover:text-[#4EA674]">
+                Checkout
+              </Link>
+              <Link href="/brands" className="hover:text-[#4EA674]">
+                Brands
+              </Link>
             </div>
 
             <div className="flex flex-wrap gap-6">
               <Link href="/" className="text-[#4EA674] border-b-2 border-[#4EA674]">
                 Home
               </Link>
-              <Link href="/about" className="hover:text-[#4EA674]">About Us</Link>
-              <Link href="/contact" className="hover:text-[#4EA674]">Contact Us</Link>
+              <Link href="/about" className="hover:text-[#4EA674]">
+                About Us
+              </Link>
+              <Link href="/contact" className="hover:text-[#4EA674]">
+                Contact Us
+              </Link>
             </div>
           </div>
         </div>
@@ -115,8 +242,12 @@ export default function PublicHeader() {
             <Link href="/pv-solar-panels" className="hover:text-[#4EA674]">
               PV SOLAR PANELS
             </Link>
-            <Link href="/inverters" className="hover:text-[#4EA674]">INVERTERS</Link>
-            <Link href="/batteries" className="hover:text-[#4EA674]">BATTERIES</Link>
+            <Link href="/inverters" className="hover:text-[#4EA674]">
+              INVERTERS
+            </Link>
+            <Link href="/batteries" className="hover:text-[#4EA674]">
+              BATTERIES
+            </Link>
             <Link href="/charge-controllers" className="hover:text-[#4EA674]">
               CHARGE CONTROLLERS
             </Link>
@@ -126,7 +257,9 @@ export default function PublicHeader() {
             <Link href="/solar-packages" className="hover:text-[#4EA674]">
               SOLAR PACKAGES
             </Link>
-            <Link href="/accessories" className="hover:text-[#4EA674]">ACCESSORIES</Link>
+            <Link href="/accessories" className="hover:text-[#4EA674]">
+              ACCESSORIES
+            </Link>
             <Link href="/categories" className="text-[#4EA674] hover:underline flex items-center gap-1">
               See more
               <ChevronRight className="w-4 h-4" />
