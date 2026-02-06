@@ -16,8 +16,13 @@ export function getUserToken() {
   return localStorage.getItem("userToken");
 }
 
+export function getUser() {
+  const profile = localStorage.getItem("userProfile");
+  return profile ? JSON.parse(profile) : null;
+}
+
 export function isUserLoggedIn() {
-  return !!localStorage.getItem("userToken");
+  return !!getUserToken();
 }
 
 export function clearUserSession() {
@@ -43,7 +48,6 @@ async function postJson(path: string, body: any) {
   return data;
 }
 
-/** Step 1: register (sends code) */
 export async function registerStep1(form: {
   name: string;
   email: string;
@@ -60,22 +64,22 @@ export async function registerStep1(form: {
   });
 }
 
-/** Step 2: verify code (returns token + user) */
 export async function registerStep2Verify(payload: { email: string; code: string }) {
   const data = await postJson("/api/verify-code", payload);
 
   if (!data.token) throw new Error("Token not returned by verify-code");
+
   setUserSession({ token: data.token, user: data.user, expires_at: data.expires_at });
 
   return data;
 }
 
-/** Returning user login: uses `login` + `password` */
 export async function loginUser(login: string, password: string) {
   const data = await postJson("/api/login", { login, password });
 
   if (!data.token) throw new Error("Token not returned by login");
-  setUserSession({ token: data.token, user: data.user, expires_at: data.expires_at });
+
+  setUserSession({ token: data.token, user: data.user || data.data, expires_at: data.expires_at });
 
   return data;
 }

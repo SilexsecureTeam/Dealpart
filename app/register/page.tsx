@@ -66,7 +66,7 @@ export default function RegisterPage() {
           <>
             <input className="w-full border p-2 mb-2" placeholder="Full name" onChange={(e) => update("name", e.target.value)} />
             <input className="w-full border p-2 mb-2" placeholder="Email" onChange={(e) => update("email", e.target.value)} />
-            <input className="w-full border p-2 mb-2" placeholder="Phone (optional)" onChange={(e) => update("phone", e.target.value)} />
+            <input className="w-full border p-2 mb-2" placeholder="Phone" onChange={(e) => update("phone", e.target.value)} />
             <input type="password" className="w-full border p-2 mb-2" placeholder="Password" onChange={(e) => update("password", e.target.value)} />
             <input type="password" className="w-full border p-2 mb-4" placeholder="Confirm password" onChange={(e) => update("password_confirmation", e.target.value)} />
 

@@ -1,9 +1,7 @@
-// src/lib/cart.ts
 import { getUserToken, clearUserSession } from "@/lib/userAuth";
 
 const BASE_URL = "https://admin.bezalelsolar.com";
 
-// ===== Cart update event (so header can refresh) =====
 const CART_EVENT = "cart:updated";
 
 export function emitCartUpdated() {
@@ -18,7 +16,6 @@ export function onCartUpdated(cb: () => void) {
   return () => window.removeEventListener(CART_EVENT, handler);
 }
 
-// ===== Helpers =====
 async function postJson(path: string, body: any, token?: string | null) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -49,12 +46,9 @@ async function postJson(path: string, body: any, token?: string | null) {
   return data;
 }
 
-// ===== API: GET CART =====
-// Your cart endpoint returns: { message: "...", data: [...] }
 export async function getCart(): Promise<any[]> {
   const token = getUserToken();
 
-  // If user is not logged in, treat cart as empty (no error)
   if (!token) return [];
 
   try {
@@ -66,7 +60,6 @@ export async function getCart(): Promise<any[]> {
       },
     });
 
-    // If token expired, clear session and return empty cart
     if (res.status === 401) {
       clearUserSession();
       return [];
@@ -79,26 +72,26 @@ export async function getCart(): Promise<any[]> {
   }
 }
 
-// ===== Cart summary helpers (Header uses this) =====
 export function calcCartSummary(items: any[]) {
-  const totalQty = (items || []).reduce(
+  const count = (items || []).reduce(
     (sum, item) => sum + Number(item?.quantity || 0),
     0
   );
 
-  return { totalQty };
+  const total = (items || []).reduce(
+    (sum, item) => sum + Number(item?.quantity || 0) * Number(item?.price || item?.unit_price || 0),
+    0
+  );
+
+  return { count, total };
 }
 
-// ===== API: ADD TO CART =====
-// Backend requires: product_id, quantity, price
 export async function addToCart(product_id: number, quantity: number, price: number) {
   const token = getUserToken();
   if (!token) throw new Error("LOGIN_REQUIRED");
 
   if (!product_id) throw new Error("Product id is required");
   if (!quantity || quantity < 1) throw new Error("Quantity must be at least 1");
-
-  // IMPORTANT: price must be a number (not "₦29.99")
   if (price === undefined || price === null || Number.isNaN(Number(price))) {
     throw new Error("Price is required");
   }

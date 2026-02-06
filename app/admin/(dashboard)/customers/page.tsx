@@ -319,7 +319,7 @@ export default function CustomersPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-300">{customer.name}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    customer.status === "Active" ? "bg-[#EAF8E7] text-[#4EA674]" :
+                    customer.status === "Active" ? "bg-[#EAF8E7] text-[#0c2417]  dark:bg-[#4EA674]/30 dark:text-[#4EA674]" :
                     customer.status === "VIP" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
                     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                   }`}>

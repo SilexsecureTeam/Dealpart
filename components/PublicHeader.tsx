@@ -1,4 +1,4 @@
-// src/components/PublicHeader.tsx
+// components/PublicHeader.tsx
 "use client";
 
 import Link from "next/link";
@@ -36,28 +36,32 @@ export default function PublicHeader() {
     const checkAuth = () => setIsLoggedIn(isUserLoggedIn());
     checkAuth();
 
-    // if other tabs update localStorage
+    // Listen for changes in other tabs/windows
     window.addEventListener("storage", checkAuth);
     return () => window.removeEventListener("storage", checkAuth);
   }, []);
 
   // --- cart refresh ---
   async function refreshCart() {
-    const res = await getCart();
-    const items = Array.isArray(res?.data) ? res.data : [];
-    const { count, total } = calcCartSummary(items);
-    setCartCount(count);
-    setCartTotal(total);
+    try {
+      const items = await getCart();
+      const { count, total } = calcCartSummary(items);
+      setCartCount(count);
+      setCartTotal(total);
+    } catch (err) {
+      console.error("Failed to refresh cart:", err);
+      setCartCount(0);
+      setCartTotal(0);
+    }
   }
 
   useEffect(() => {
     refreshCart();
     const off = onCartUpdated(() => refreshCart());
     return () => off();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // close menu when clicking outside
+  // close user menu when clicking outside
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!menuRef.current) return;
@@ -79,7 +83,7 @@ export default function PublicHeader() {
       {/* TOP BAR */}
       <div className="bg-white py-3 border-b shadow-sm">
         <div className="container mx-auto px-4 flex flex-wrap items-center justify-between gap-4 md:gap-6">
-          {/* Left */}
+          {/* Left section */}
           <div className="flex items-center gap-5 md:gap-8 flex-wrap">
             <Link href="/">
               <Image
@@ -92,7 +96,7 @@ export default function PublicHeader() {
             </Link>
 
             <button className="flex items-center gap-2 text-sm text-gray-700 hover:text-[#4EA674]">
-              <Image src="/ng.png" alt="Nigeria" width={20} height={14} className="" />
+              <Image src="/ng.png" alt="Nigeria" width={20} height={14} />
               EN
               <ChevronDown className="w-4 h-4" />
             </button>
@@ -104,7 +108,7 @@ export default function PublicHeader() {
             </button>
           </div>
 
-          {/* Right */}
+          {/* Right section */}
           <div className="flex items-center gap-4 md:gap-6">
             <div className="hidden md:block relative w-64 lg:w-80">
               <input
@@ -115,7 +119,7 @@ export default function PublicHeader() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             </div>
 
-            {/* USER ICON: login or dropdown */}
+            {/* User icon: login or dropdown */}
             {!isLoggedIn ? (
               <Link
                 href={`/login?next=${nextParam}`}

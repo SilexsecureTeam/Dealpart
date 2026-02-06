@@ -25,7 +25,7 @@ export default function InvertersPage() {
                 <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-black mb-3 md:mb-4 drop-shadow-xl leading-tight">
                   Solar Hybrid Inverters
                 </h2>
-                <p className="text-base sm:text-lg md:text-xl mb-6 md:mb-8 max-w-md drop-shadow-lg">
+                <p className="text-base sm:text-lg md:text-xl text-white mb-6 md:mb-8 max-w-md drop-shadow-lg">
                   This is a brief Category description
                 </p>
                 <Link
@@ -51,7 +51,7 @@ export default function InvertersPage() {
                 <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-black mb-3 md:mb-4 drop-shadow-xl leading-tight">
                   Solar Standard Inverters
                 </h2>
-                <p className="text-base sm:text-lg md:text-xl mb-6 md:mb-8 max-w-md drop-shadow-lg">
+                <p className="text-base sm:text-lg md:text-xl text-white mb-6 md:mb-8 max-w-md drop-shadow-lg">
                   This is a brief Category description
                 </p>
                 <Link
