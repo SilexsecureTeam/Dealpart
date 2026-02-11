@@ -5,16 +5,16 @@ import Image from "next/image";
 import {
   Search,
   Bell,
-  Settings,
-  MoreVertical,
   Calendar,
   Edit2,
   Trash2,
   Sun,
   Moon,
   Plus,
+  X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { api } from "@/lib/apiClient"; // ✅ admin api client
 
 type Category = {
   id: number;
@@ -28,10 +28,6 @@ type Category = {
 };
 
 export default function AddProductPage() {
-  const BASE_URL = "https://admin.bezalelsolar.com";
-  const PRODUCTS_URL = `${BASE_URL}/api/products`;
-  const CATEGORIES_URL = `${BASE_URL}/api/categories`;
-
   const [currency, setCurrency] = useState("US");
 
   // Form states
@@ -51,12 +47,12 @@ export default function AddProductPage() {
 
   // Categories dropdown
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryId, setCategoryId] = useState<string>(""); // keep as string for select
+  const [categoryId, setCategoryId] = useState<string>("");
   const [catLoading, setCatLoading] = useState(false);
 
   // Images + validation
-  const [images, setImages] = useState<string[]>([]);       // preview URLs
-  const [imageFiles, setImageFiles] = useState<File[]>([]); // actual files
+  const [images, setImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
 
   // General form errors
@@ -75,29 +71,12 @@ export default function AddProductPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  function getTokenOrThrow() {
-  const token =
-    localStorage.getItem("token") ||
-    localStorage.getItem("adminToken");
-
-  if (!token) {
-    throw new Error("Admin session missing. Please login again.");
-  }
-
-  return token;
-}
-  // Fetch categories for dropdown
+  // ✅ Fetch categories using admin API client
   async function fetchCategories() {
     setCatLoading(true);
     try {
-      const res = await fetch(CATEGORIES_URL, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-      const json = (await res.json().catch(() => ([]))) as Category[] | any;
-      if (!res.ok) return;
-
-      const list = Array.isArray(json) ? (json as Category[]) : (json?.data as Category[]) || [];
+      const json = await api.categories.list();
+      const list = Array.isArray(json) ? json : (json?.data as Category[]) || [];
       setCategories(list);
     } finally {
       setCatLoading(false);
@@ -109,28 +88,24 @@ export default function AddProductPage() {
     fetchCategories();
   }, []);
 
-  // Image upload handler with full validation
+  // Image upload handler
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
 
     const newFiles = Array.from(e.target.files);
     const totalAfter = images.length + newFiles.length;
 
-    // Max 5 images
     if (totalAfter > 5) {
       setImageError(`Maximum 5 images allowed (${5 - images.length} remaining)`);
       return;
     }
 
-    // Validate each file
     for (const file of newFiles) {
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
       if (!validTypes.includes(file.type)) {
         setImageError('Only JPG, JPEG, PNG, WEBP, GIF files are allowed');
         return;
       }
-
-      // Max size 5MB
       if (file.size > 5 * 1024 * 1024) {
         setImageError('Each image must be less than 5MB');
         return;
@@ -138,44 +113,36 @@ export default function AddProductPage() {
     }
 
     setImageError(null);
-
     const newPreviews = newFiles.map(file => URL.createObjectURL(file));
     setImages(prev => [...prev, ...newPreviews]);
     setImageFiles(prev => [...prev, ...newFiles]);
-
     e.target.value = '';
   };
 
-  // Remove image
   const handleRemoveImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
     setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Full form validation including images
+  // Form validation
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Product Name
     if (!productName.trim()) newErrors.productName = 'Product name is required';
     else if (productName.trim().length < 5) newErrors.productName = 'Product name must be at least 5 characters';
 
-    // Description
     if (!description.trim()) newErrors.description = 'Product description is required';
     else if (description.trim().length < 20) newErrors.description = 'Description should be at least 20 characters';
 
-    // Price
     if (!price.trim()) newErrors.price = 'Product price is required';
     else if (isNaN(Number(price)) || Number(price) <= 0) newErrors.price = 'Price must be a positive number';
 
-    // Discounted Price (optional)
     if (discountedPrice.trim() && !isNaN(Number(discountedPrice))) {
       if (Number(discountedPrice) >= Number(price)) {
         newErrors.discountedPrice = 'Discounted price must be lower than regular price';
       }
     }
 
-    // Stock Quantity when not unlimited
     if (!unlimitedStock) {
       if (!stockQuantity.trim()) newErrors.stockQuantity = 'Stock quantity is required';
       else if (!/^\d+$/.test(stockQuantity) || Number(stockQuantity) <= 0) {
@@ -183,14 +150,12 @@ export default function AddProductPage() {
       }
     }
 
-    // Dates
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
       if (end < start) newErrors.endDate = 'End date must be after start date';
     }
 
-    // Image validation (required)
     if (images.length === 0) {
       newErrors.images = 'At least one product image is required';
       setImageError('At least one image is required');
@@ -200,7 +165,7 @@ export default function AddProductPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ CREATE PRODUCT with images[0], images[1], ... + Authorization
+  // ✅ Publish product using admin API client
   const handlePublish = async () => {
     setPageMsg(null);
 
@@ -211,53 +176,16 @@ export default function AddProductPage() {
 
     setSubmitting(true);
     try {
-      const token = getTokenOrThrow();
+      const formData = new FormData();
+      formData.append("name", productName.trim());
+      formData.append("description", description.trim());
+      formData.append("sale_price_inc_tax", price);
+      if (discountedPrice.trim()) formData.append("sale_price", discountedPrice);
+      if (categoryId) formData.append("category_id", categoryId);
+      if (!unlimitedStock && stockQuantity.trim()) formData.append("stock_quantity", stockQuantity);
+      imageFiles.forEach((file, idx) => formData.append(`images[${idx}]`, file));
 
-      const fd = new FormData();
-
-      // confirmed keys from your API response
-      fd.append("name", productName);
-      fd.append("description", description);
-
-      // backend returned sale_price_inc_tax in your test
-      fd.append("sale_price_inc_tax", price);
-
-      // optional
-      if (discountedPrice.trim()) fd.append("sale_price", discountedPrice);
-
-      // category (if selected)
-      if (categoryId) fd.append("category_id", categoryId);
-
-      // optional stock quantity
-      if (!unlimitedStock && stockQuantity.trim()) fd.append("stock_quantity", stockQuantity);
-
-      // images indexed keys (backend expects images[0])
-      imageFiles.forEach((file, idx) => {
-        fd.append(`images[${idx}]`, file);
-      });
-
-      const res = await fetch(PRODUCTS_URL, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-          // DON'T set Content-Type for FormData
-        },
-        body: fd,
-      });
-
-      const json = await res.json().catch(() => ({} as any));
-
-      if (!res.ok) {
-        const firstError =
-          json?.errors &&
-          Object.values(json.errors)?.[0] &&
-          (Object.values(json.errors)[0] as any)?.[0];
-
-        setPageMsg({ type: "error", text: firstError || json?.message || "Unauthenticated / Product creation failed." });
-        return;
-      }
-
+      const json = await api.products.create(formData);
       setPageMsg({ type: "success", text: json?.message || "Product created successfully!" });
     } catch (e: any) {
       setPageMsg({ type: "error", text: e?.message || "Network error creating product." });
@@ -270,9 +198,13 @@ export default function AddProductPage() {
     setPageMsg({ type: "success", text: "Draft saved!" });
   };
 
+  if (!mounted) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header */}
+      {/* Header – EXACT original */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Add Product</h1>
 
@@ -300,27 +232,23 @@ export default function AddProductPage() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
 
-          {!mounted ? (
-            <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-700" />
-          ) : (
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              aria-label="Toggle dark mode"
-              type="button"
-            >
-              <Sun
-                className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
-                  theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
-                }`}
-              />
-              <Moon
-                className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
-                  theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
-                }`}
-              />
-            </button>
-          )}
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            aria-label="Toggle dark mode"
+            type="button"
+          >
+            <Sun
+              className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
+                theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+              }`}
+            />
+            <Moon
+              className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
+                theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+              }`}
+            />
+          </button>
 
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
             <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
@@ -343,6 +271,22 @@ export default function AddProductPage() {
       )}
 
       <main className="p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
+        {/* Page message */}
+        {pageMsg && (
+          <div
+            className={`mb-6 rounded-xl px-4 py-3 text-sm border flex justify-between items-center ${
+              pageMsg.type === "success"
+                ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300"
+                : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300"
+            }`}
+          >
+            <span>{pageMsg.text}</span>
+            <button onClick={() => setPageMsg(null)} className="p-1">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Top Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Add New Product</h2>
@@ -380,7 +324,6 @@ export default function AddProductPage() {
             {/* Basic Details */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Basic Details</h3>
-
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Name</label>
@@ -392,11 +335,8 @@ export default function AddProductPage() {
                       errors.productName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                     }`}
                   />
-                  {errors.productName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.productName}</p>
-                  )}
+                  {errors.productName && <p className="mt-1 text-sm text-red-600">{errors.productName}</p>}
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Description</label>
                   <textarea
@@ -407,9 +347,7 @@ export default function AddProductPage() {
                       errors.description ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                     }`}
                   />
-                  {errors.description && (
-                    <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-                  )}
+                  {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
                 </div>
               </div>
             </div>
@@ -417,7 +355,6 @@ export default function AddProductPage() {
             {/* Pricing */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Pricing</h3>
-
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Price</label>
@@ -460,13 +397,9 @@ export default function AddProductPage() {
                           }`}
                         />
                       </div>
-                      <div className="text-sm text-gray-600 whitespace-nowrap">
-                        Sale = ₦{discountedPrice || '0'}
-                      </div>
+                      <div className="text-sm text-gray-600 whitespace-nowrap">Sale = ₦{discountedPrice || '0'}</div>
                     </div>
-                    {errors.discountedPrice && (
-                      <p className="mt-1 text-sm text-red-600">{errors.discountedPrice}</p>
-                    )}
+                    {errors.discountedPrice && <p className="mt-1 text-sm text-red-600">{errors.discountedPrice}</p>}
                   </div>
 
                   <div className="flex items-center gap-8 self-end">
@@ -513,7 +446,6 @@ export default function AddProductPage() {
                   </div>
                   {errors.startDate && <p className="mt-1 text-sm text-red-600">{errors.startDate}</p>}
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">End</label>
                   <div className="relative">
@@ -533,7 +465,6 @@ export default function AddProductPage() {
             {/* Inventory */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Inventory</h3>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">Stock Quantity</label>
@@ -547,11 +478,8 @@ export default function AddProductPage() {
                       unlimitedStock ? 'opacity-60 cursor-not-allowed' : ''
                     } ${errors.stockQuantity ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                   />
-                  {errors.stockQuantity && (
-                    <p className="mt-1 text-sm text-red-600">{errors.stockQuantity}</p>
-                  )}
+                  {errors.stockQuantity && <p className="mt-1 text-sm text-red-600">{errors.stockQuantity}</p>}
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">Stock Status</label>
                   <select
@@ -565,7 +493,6 @@ export default function AddProductPage() {
                   </select>
                 </div>
               </div>
-
               <div className="mt-8 space-y-4">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <div className="relative inline-block w-12 h-6">
@@ -580,7 +507,6 @@ export default function AddProductPage() {
                   </div>
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Unlimited</span>
                 </label>
-
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -600,14 +526,12 @@ export default function AddProductPage() {
           <div className="space-y-8">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Upload Product Image</h3>
-
               <div className="space-y-6">
                 {images.length > 0 && (
                   <div className="relative rounded-xl overflow-hidden aspect-video border border-gray-200 dark:border-gray-700">
                     <Image src={images[0]} alt="Main preview" fill className="object-cover" />
                   </div>
                 )}
-
                 <div className="flex flex-wrap gap-4">
                   {images.map((img, i) => (
                     <div key={i} className="relative w-24 h-24 group">
@@ -621,7 +545,6 @@ export default function AddProductPage() {
                       </button>
                     </div>
                   ))}
-
                   {images.length < 5 && (
                     <label className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-[#4EA674] cursor-pointer transition">
                       <input
@@ -635,13 +558,11 @@ export default function AddProductPage() {
                     </label>
                   )}
                 </div>
-
                 {(imageError || errors.images) && (
                   <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 p-3 rounded-lg">
                     {imageError || errors.images}
                   </p>
                 )}
-
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Supported: JPG, JPEG, PNG, WEBP, GIF • Max 5MB per image • Max 5 images
                 </p>
@@ -672,7 +593,6 @@ export default function AddProductPage() {
                       ))}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Tag</label>
                   <select
@@ -682,7 +602,6 @@ export default function AddProductPage() {
                     <option>Tag endpoint not available yet</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">Select your color</label>
                   <div className="flex gap-3 flex-wrap">

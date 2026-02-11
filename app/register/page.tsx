@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { registerStep1, registerStep2Verify } from "@/lib/userAuth";
+import { customerApi } from "@/lib/customerApiClient";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null); // store user_id from registration
 
   function update(k: string, v: string) {
     setForm((p) => ({ ...p, [k]: v }));
@@ -33,11 +34,19 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await registerStep1(form);
+      // ✅ Use customerApi.auth.register()
+      const response = await customerApi.auth.register(form);
+      
+      // Extract user_id from response – adjust path based on your API
+      const userId = response.user?.id || response.data?.user?.id || response.data?.id;
+      if (userId) {
+        setUserId(String(userId));
+      }
+
       setStep(2);
       setMsg("Verification code sent to email");
     } catch (e: any) {
-      setMsg(e.message);
+      setMsg(e.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -46,10 +55,11 @@ export default function RegisterPage() {
   async function submitStep2() {
     setLoading(true);
     try {
-      await registerStep2Verify({ email: form.email, code });
+      // ✅ Use customerApi.auth.verifyCode() with user_id
+      await customerApi.auth.verifyCode(code, userId || undefined);
       router.push(next);
     } catch (e: any) {
-      setMsg(e.message);
+      setMsg(e.message || "Verification failed");
     } finally {
       setLoading(false);
     }
@@ -64,23 +74,63 @@ export default function RegisterPage() {
 
         {step === 1 && (
           <>
-            <input className="w-full border p-2 mb-2" placeholder="Full name" onChange={(e) => update("name", e.target.value)} />
-            <input className="w-full border p-2 mb-2" placeholder="Email" onChange={(e) => update("email", e.target.value)} />
-            <input className="w-full border p-2 mb-2" placeholder="Phone" onChange={(e) => update("phone", e.target.value)} />
-            <input type="password" className="w-full border p-2 mb-2" placeholder="Password" onChange={(e) => update("password", e.target.value)} />
-            <input type="password" className="w-full border p-2 mb-4" placeholder="Confirm password" onChange={(e) => update("password_confirmation", e.target.value)} />
+            <input
+              className="w-full border p-2 mb-2"
+              placeholder="Full name"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+            />
+            <input
+              className="w-full border p-2 mb-2"
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => update("email", e.target.value)}
+            />
+            <input
+              className="w-full border p-2 mb-2"
+              placeholder="Phone"
+              value={form.phone}
+              onChange={(e) => update("phone", e.target.value)}
+            />
+            <input
+              type="password"
+              className="w-full border p-2 mb-2"
+              placeholder="Password"
+              value={form.password}
+              onChange={(e) => update("password", e.target.value)}
+            />
+            <input
+              type="password"
+              className="w-full border p-2 mb-4"
+              placeholder="Confirm password"
+              value={form.password_confirmation}
+              onChange={(e) => update("password_confirmation", e.target.value)}
+            />
 
-            <button onClick={submitStep1} className="w-full bg-[#4EA674] text-white py-2 rounded">
-              Continue
+            <button
+              onClick={submitStep1}
+              disabled={loading}
+              className="w-full bg-[#4EA674] text-white py-2 rounded"
+            >
+              {loading ? "Please wait..." : "Continue"}
             </button>
           </>
         )}
 
         {step === 2 && (
           <>
-            <input className="w-full border p-2 mb-4" placeholder="Verification code" onChange={(e) => setCode(e.target.value)} />
-            <button onClick={submitStep2} className="w-full bg-[#023337] text-white py-2 rounded">
-              Verify & Continue
+            <input
+              className="w-full border p-2 mb-4"
+              placeholder="Verification code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <button
+              onClick={submitStep2}
+              disabled={loading}
+              className="w-full bg-[#023337] text-white py-2 rounded"
+            >
+              {loading ? "Verifying..." : "Verify & Continue"}
             </button>
           </>
         )}

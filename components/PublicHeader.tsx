@@ -1,4 +1,3 @@
-// components/PublicHeader.tsx
 "use client";
 
 import Link from "next/link";
@@ -13,9 +12,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { clearUserSession, isUserLoggedIn } from "@/lib/userAuth";
-import { getCart, calcCartSummary, onCartUpdated } from "@/lib/cart";
 import { usePathname, useRouter } from "next/navigation";
+import { customerApi } from "@/lib/customerApiClient"; // ✅ unified customer client
+import { getCart, calcCartSummary, onCartUpdated } from "@/lib/cart";
 
 export default function PublicHeader() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -31,14 +30,18 @@ export default function PublicHeader() {
 
   const nextParam = encodeURIComponent(pathname || "/");
 
-  // --- auth check ---
+  // --- auth check (replaces isUserLoggedIn) ---
   useEffect(() => {
-    const checkAuth = () => setIsLoggedIn(isUserLoggedIn());
-    checkAuth();
+    const checkAuth = () => {
+      if (typeof window === "undefined") return false;
+      return !!localStorage.getItem("customerToken");
+    };
+    setIsLoggedIn(checkAuth());
 
     // Listen for changes in other tabs/windows
-    window.addEventListener("storage", checkAuth);
-    return () => window.removeEventListener("storage", checkAuth);
+    const handleStorage = () => setIsLoggedIn(checkAuth());
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   // --- cart refresh ---
@@ -71,8 +74,9 @@ export default function PublicHeader() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  // --- logout (replaces clearUserSession) ---
   function logout() {
-    clearUserSession();
+    customerApi.auth.logout(); // ✅ removes customerToken & customerUser
     setIsLoggedIn(false);
     setUserMenuOpen(false);
     router.push(`/login?next=${encodeURIComponent("/")}`);

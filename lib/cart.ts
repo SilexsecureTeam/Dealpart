@@ -1,6 +1,4 @@
-import { getUserToken, clearUserSession } from "@/lib/userAuth";
-
-const BASE_URL = "https://admin.bezalelsolar.com";
+import { customerApi } from "@/lib/customerApiClient";
 
 const CART_EVENT = "cart:updated";
 
@@ -16,62 +14,28 @@ export function onCartUpdated(cb: () => void) {
   return () => window.removeEventListener(CART_EVENT, handler);
 }
 
-async function postJson(path: string, body: any, token?: string | null) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    if (res.status === 401) {
-      clearUserSession();
-      throw new Error("SESSION_EXPIRED");
-    }
-    const validation = data?.errors
-      ? (Object.values(data.errors).flat() as string[]).join(" ")
-      : null;
-
-    throw new Error(validation || data.message || "Request failed");
-  }
-
-  return data;
-}
-
+/**
+ * Get current cart items – returns empty array if not logged in or error
+ */
 export async function getCart(): Promise<any[]> {
-  const token = getUserToken();
-
+  const token = typeof window !== "undefined" ? localStorage.getItem("customerToken") : null;
   if (!token) return [];
 
   try {
-    const res = await fetch(`${BASE_URL}/api/cart`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    if (res.status === 401) {
-      clearUserSession();
-      return [];
-    }
-
-    const json = await res.json().catch(() => ({}));
+    const json = await customerApi.cart.get();
     return Array.isArray(json?.data) ? json.data : [];
-  } catch {
+  } catch (err: any) {
+    // If session expired, clear token
+    if (err?.message?.includes("401") || err?.message?.includes("SESSION_EXPIRED")) {
+      customerApi.auth.logout();
+    }
     return [];
   }
 }
 
+/**
+ * Calculate cart summary (count & total)
+ */
 export function calcCartSummary(items: any[]) {
   const count = (items || []).reduce(
     (sum, item) => sum + Number(item?.quantity || 0),
@@ -79,15 +43,19 @@ export function calcCartSummary(items: any[]) {
   );
 
   const total = (items || []).reduce(
-    (sum, item) => sum + Number(item?.quantity || 0) * Number(item?.price || item?.unit_price || 0),
+    (sum, item) =>
+      sum + Number(item?.quantity || 0) * Number(item?.price || item?.unit_price || 0),
     0
   );
 
   return { count, total };
 }
 
+/**
+ * Add product to cart – throws LOGIN_REQUIRED if not logged in
+ */
 export async function addToCart(product_id: number, quantity: number, price: number) {
-  const token = getUserToken();
+  const token = typeof window !== "undefined" ? localStorage.getItem("customerToken") : null;
   if (!token) throw new Error("LOGIN_REQUIRED");
 
   if (!product_id) throw new Error("Product id is required");
@@ -96,16 +64,7 @@ export async function addToCart(product_id: number, quantity: number, price: num
     throw new Error("Price is required");
   }
 
-  const data = await postJson(
-    "/api/cart/add",
-    {
-      product_id,
-      quantity,
-      price: Number(price),
-    },
-    token
-  );
-
+  const data = await customerApi.cart.add(product_id, quantity, price);
   emitCartUpdated();
   return data;
 }

@@ -17,33 +17,33 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { api } from "@/lib/apiClient";
 
 type Msg = { type: "success" | "error"; text: string } | null;
 
+type ProfileData = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  avatar: string | null;
+  avatar_url?: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  dob: string | null;
+  location: string | null;
+  bio: string | null;
+  role?: string | null;
+};
+
 type ProfileResponse = {
-  success: boolean;
-  data: {
-    id: number;
-    name: string | null;
-    email: string | null;
-    phone: string | null;
-    avatar: string | null;
-    first_name: string | null;
-    last_name: string | null;
-    dob: string | null;
-    location: string | null;
-    bio: string | null;
-    role?: string | null;
-  };
+  message?: string;
+  success?: boolean;
+  status?: boolean;
+  data: ProfileData;
 };
 
 export default function AdminRolePage() {
-  const BASE_URL = "https://admin.bezalelsolar.com";
-  const PROFILE_URL = `${BASE_URL}/api/admin/profile`;
-  const UPDATE_PROFILE_URL = `${BASE_URL}/api/admin/profile`;
-  const UPDATE_PASSWORD_URL = `${BASE_URL}/api/admin/profile/password`;
-  const UPLOAD_AVATAR_URL = `${BASE_URL}/api/admin/profile/avatar`;
-
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -58,8 +58,11 @@ export default function AdminRolePage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // ✅ Avatar state (uses proxy for protected images)
   const [avatarUrl, setAvatarUrl] = useState<string>("/man.png");
 
+  // ✅ Profile form state
   const [formData, setFormData] = useState({
     firstName: "Wade",
     lastName: "Warren",
@@ -73,6 +76,7 @@ export default function AdminRolePage() {
     creditCard: "843-4359-4444",
   });
 
+  // ✅ Password change form state
   const [pwd, setPwd] = useState({
     current_password: "",
     password: "",
@@ -81,30 +85,31 @@ export default function AdminRolePage() {
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdMsg, setPwdMsg] = useState<Msg>(null);
 
-  function getTokenOrThrow() {
-    const token = localStorage.getItem("adminToken");
-    if (!token) throw new Error("Admin session missing. Please login again.");
-    return token;
-  }
-
-  function resolveAvatar(url: string | null) {
-    if (!url || url.trim() === "") return "/man.png";
-    const u = url.trim();
-    if (u.startsWith("blob:")) return u;
-    if (u.startsWith("http://") || u.startsWith("https://")) return u;
-    const clean = u.startsWith("/") ? u.slice(1) : u;
-    return `${BASE_URL}/${clean}`;
-  }
-
-  function bust(url: string) {
-    return `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
-  }
-
+  // ---------- Helper: split full name ----------
   function splitName(fullName: string) {
     const parts = fullName.trim().split(" ").filter(Boolean);
     return { first: parts[0] || "", last: parts.slice(1).join(" ") || "" };
   }
 
+  // ---------- Helper: resolve avatar URL (same logic) ----------
+  function resolveAvatar(pathOrUrl: string | null | undefined) {
+    if (!pathOrUrl || String(pathOrUrl).trim() === "") return null;
+    const raw = String(pathOrUrl).trim();
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    let clean = raw.startsWith("/") ? raw.slice(1) : raw;
+    if (clean.startsWith("avatars/")) clean = `storage/${clean}`;
+    return `${process.env.NEXT_PUBLIC_API_URL || "https://admin.bezalelsolar.com"}/${clean}`;
+  }
+
+  // ---------- Helper: proxy image URL (unchanged) ----------
+  function proxiedImageUrl(realUrl: string) {
+    const token = localStorage.getItem("adminToken") || "";
+    return `/api/proxy-image?url=${encodeURIComponent(realUrl)}&token=${encodeURIComponent(
+      token
+    )}&t=${Date.now()}`;
+  }
+
+  // ---------- Helper: copy to clipboard ----------
   async function copyToClipboard(text: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -116,28 +121,24 @@ export default function AdminRolePage() {
     }
   }
 
+  // ---------- Load avatar from localStorage (proxy) ----------
+  function loadAvatarFromStorage() {
+    const savedSrc = localStorage.getItem("adminAvatarSrc");
+    if (!savedSrc) return;
+    setAvatarUrl(proxiedImageUrl(savedSrc));
+  }
+
+  // ---------- Fetch profile via apiClient ----------
   async function fetchProfile() {
     setProfileMsg(null);
     setProfileLoading(true);
+
     try {
-      const token = getTokenOrThrow();
-      const res = await fetch(PROFILE_URL, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
+      const json = (await api.profile.get()) as ProfileResponse;
 
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        setProfileMsg({ type: "error", text: (json as any)?.message || "Failed to load profile." });
-        return;
-      }
-
-      const json = await res.json() as ProfileResponse;
       const u = json.data;
 
+      // Update form
       const fullName = u?.name || "";
       const { first, last } = splitName(fullName);
 
@@ -153,138 +154,122 @@ export default function AdminRolePage() {
         password: "********",
       }));
 
-      // ────────────────────────────────────────────────
-      // AVATAR UPDATE REMOVED HERE ON PURPOSE
-      // We no longer let the profile endpoint overwrite avatar
-      // (it returns outdated value after upload)
-      // Avatar is now only controlled by upload/delete + localStorage
-      // ────────────────────────────────────────────────
+      // Avatar from API
+      const fromApi = u?.avatar_url || u?.avatar || null;
+      const realUrl = resolveAvatar(fromApi);
+
+      if (realUrl) {
+        localStorage.setItem("adminAvatarSrc", realUrl);
+        setAvatarUrl(proxiedImageUrl(realUrl));
+      } else {
+        setAvatarUrl("/man.png");
+        localStorage.removeItem("adminAvatarSrc");
+      }
 
       localStorage.setItem("adminUser", JSON.stringify(u));
     } catch (e: any) {
-      setProfileMsg({ type: "error", text: e?.message || "Network error loading profile." });
+      setProfileMsg({
+        type: "error",
+        text: e?.message || "Network error loading profile.",
+      });
     } finally {
       setProfileLoading(false);
     }
   }
 
+  // ---------- Save profile via apiClient ----------
   async function handleSaveProfile() {
     setProfileMsg(null);
     setProfileSaving(true);
-    try {
-      const token = getTokenOrThrow();
 
-      const res = await fetch(UPDATE_PROFILE_URL, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          phone: formData.phone,
-          dob: formData.dob || null,
-          location: formData.location || null,
-          bio: formData.bio || null,
-        }),
+    try {
+      const json = await api.profile.update({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone: formData.phone,
+        dob: formData.dob || null,
+        location: formData.location || null,
+        bio: formData.bio || null,
       });
 
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const firstError = json?.errors && Object.values(json.errors)?.[0]?.[0];
-        setProfileMsg({ type: "error", text: firstError || json?.message || "Profile update failed." });
-        return;
-      }
+      setProfileMsg({
+        type: "success",
+        text: json?.message || "Profile updated successfully.",
+      });
 
-      setProfileMsg({ type: "success", text: json?.message || "Profile updated successfully." });
-      setTimeout(() => fetchProfile(), 800);
+      setTimeout(() => fetchProfile(), 600);
     } catch (e: any) {
-      setProfileMsg({ type: "error", text: e?.message || "Network error updating profile." });
+      setProfileMsg({
+        type: "error",
+        text: e?.message || "Network error updating profile.",
+      });
     } finally {
       setProfileSaving(false);
     }
   }
 
+  // ---------- Upload avatar via apiClient ----------
   async function uploadAvatar(file: File) {
     setProfileMsg(null);
     setAvatarUploading(true);
 
-    const previewUrl = URL.createObjectURL(file);
-    setAvatarUrl(previewUrl);
-    console.log("Preview set:", previewUrl);
+    // Preview immediately
+    const preview = URL.createObjectURL(file);
+    setAvatarUrl(preview);
 
     try {
-      const token = getTokenOrThrow();
-      const fd = new FormData();
-      fd.append("avatar", file);
-
-      const res = await fetch(UPLOAD_AVATAR_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: fd,
-      });
-
-      const json = await res.json().catch(() => ({}));
-      console.log("Upload response:", json);
-
-      if (!res.ok) {
-        const firstError = json?.errors && Object.values(json.errors)?.[0]?.[0];
-        const lastSaved = localStorage.getItem("adminAvatarUrl");
-        setAvatarUrl(lastSaved || "/man.png");
-        setProfileMsg({ type: "error", text: firstError || json?.message || "Avatar upload failed." });
-        return;
-      }
+      const json = await api.profile.uploadAvatar(file);
 
       const possibleAvatar =
         json?.avatar_url ||
+        json?.user?.avatar_url ||
+        json?.user?.avatar ||
+        json?.data?.avatar_url ||
         json?.data?.avatar ||
         json?.avatar ||
-        json?.data?.url ||
-        json?.url ||
         null;
 
-      console.log("Extracted avatar:", possibleAvatar);
-
       if (possibleAvatar) {
-        const serverUrl = resolveAvatar(String(possibleAvatar));
-        const finalUrl = bust(serverUrl);
-        console.log("Setting new avatar URL:", finalUrl);
-        setAvatarUrl(finalUrl);
-        localStorage.setItem("adminAvatarUrl", finalUrl);
+        const realUrl = resolveAvatar(String(possibleAvatar));
+        if (realUrl) {
+          localStorage.setItem("adminAvatarSrc", realUrl);
+          setAvatarUrl(proxiedImageUrl(realUrl));
+        } else {
+          setAvatarUrl("/man.png");
+        }
+      } else {
+        await fetchProfile();
       }
 
-      setProfileMsg({ type: "success", text: json?.message || "Avatar uploaded successfully." });
-
-      // No fetchProfile() here — we don't want to overwrite avatar
-
+      setProfileMsg({
+        type: "success",
+        text: json?.message || "Avatar uploaded successfully.",
+      });
     } catch (e: any) {
-      console.error("Upload error:", e);
-      const lastSaved = localStorage.getItem("adminAvatarUrl");
-      setAvatarUrl(lastSaved || "/man.png");
-      setProfileMsg({ type: "error", text: e?.message || "Network error uploading avatar." });
+      setProfileMsg({
+        type: "error",
+        text: e?.message || "Network error uploading avatar.",
+      });
+      loadAvatarFromStorage();
     } finally {
       setAvatarUploading(false);
     }
   }
 
+  // ---------- Delete avatar (frontend only – same as before) ----------
   function deleteAvatarFrontendOnly() {
     setAvatarUrl("/man.png");
-    localStorage.removeItem("adminAvatarUrl");
+    localStorage.removeItem("adminAvatarSrc");
     setProfileMsg({ type: "success", text: "Avatar removed (frontend only)." });
     setTimeout(() => setProfileMsg(null), 1200);
   }
 
+  // ---------- Update password via apiClient ----------
   async function handleUpdatePassword() {
     setPwdMsg(null);
     setPwdLoading(true);
-    try {
-      const token = getTokenOrThrow();
 
+    try {
       if (!pwd.current_password || !pwd.password || !pwd.password_confirmation) {
         setPwdMsg({ type: "error", text: "Please fill all password fields." });
         return;
@@ -294,22 +279,7 @@ export default function AdminRolePage() {
         return;
       }
 
-      const res = await fetch(UPDATE_PASSWORD_URL, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: JSON.stringify(pwd),
-      });
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const firstError = json?.errors && Object.values(json.errors)?.[0]?.[0];
-        setPwdMsg({ type: "error", text: firstError || json?.message || "Password update failed." });
-        return;
-      }
+      const json = await api.profile.updatePassword(pwd);
 
       setPwdMsg({ type: "success", text: json?.message || "Password updated successfully." });
       setPwd({ current_password: "", password: "", password_confirmation: "" });
@@ -320,10 +290,10 @@ export default function AdminRolePage() {
     }
   }
 
+  // ---------- Initial load ----------
   useEffect(() => {
     setMounted(true);
-    const savedAvatar = localStorage.getItem("adminAvatarUrl");
-    if (savedAvatar) setAvatarUrl(savedAvatar);
+    loadAvatarFromStorage();
     fetchProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -339,6 +309,7 @@ export default function AdminRolePage() {
     />
   );
 
+  // ---------- Render (EXACT original JSX) ----------
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       {/* Header */}
@@ -634,20 +605,18 @@ export default function AdminRolePage() {
                   className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2 text-gray-800 dark:text-gray-100"
                 >
                   <Edit2 className="w-4 h-4" />
-                  Edit
+                  Refresh
                 </button>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-8">
                 <div className="relative">
                   <div className="w-14 h-14 rounded-full overflow-hidden ring-4 ring-gray-100 dark:ring-gray-700">
-                    <Image
+                    <img
                       src={avatarUrl}
                       alt="Profile"
-                      width={56}
-                      height={56}
-                      unoptimized
                       className="object-cover w-full h-full"
+                      onError={() => setAvatarUrl("/man.png")}
                     />
                   </div>
                 </div>

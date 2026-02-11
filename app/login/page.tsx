@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loginUser } from "@/lib/userAuth";
+import { customerApi } from "@/lib/customerApiClient";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await loginUser(login, password);
+      await customerApi.auth.login(login, password);
       router.push(next);
     } catch (e: any) {
       setMsg(e.message || "Login failed");

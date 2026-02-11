@@ -1,56 +1,198 @@
-// app/shop/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, Star, ChevronRight, ChevronDown } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation'; // ✅ added
+import { Heart, Star, ChevronRight, ChevronDown, Loader2, X } from 'lucide-react';
+import { customerApi } from '@/lib/customerApiClient';
+import { addToCart } from '@/lib/cart'; // ✅ added
 
-// Mock products (replace with real data/API later)
-const allProducts = [
-  { id: 1, slug: 'uthium-lifepo4-battery-12v-100ah', name: 'Uthium LiFePO4 Battery 12V / 100Ah', price: 119999, image: '/offer.jpg', rating: 4.5, stock: 'In stock' },
-  { id: 2, slug: 'solar-motion-sensor-light-24z', name: 'Solar Motion Sensor Light (24z)', price: 11999, image: '/offer.jpg', rating: 4.2, stock: 'In stock' },
-  { id: 3, slug: 'mppt-charge-controller-60a', name: 'MPPT Charge Controller 60A', price: 119999, image: '/offer.jpg', rating: 4.7, stock: 'In stock' },
-  { id: 4, slug: 'felicity-ivem6048-6kva-hybrid-inverter-48v', name: 'Felicity Solar Hybrid Inverter 6kVA', price: 485000, image: '/offer.jpg', rating: 4.8, stock: 'In stock' },
-  { id: 5, slug: 'lithium-lifepo4-battery-12v-200ah', name: 'Lithium LiFePO4 Battery 12V / 200Ah', price: 189999, image: '/offer.jpg', rating: 4.6, stock: 'In stock' },
-  { id: 6, slug: 'solar-battery-deep-cycle-150ah', name: 'Solar Battery Deep Cycle 150Ah', price: 149999, image: '/offer.jpg', rating: 4.4, stock: 'Low stock' },
-  { id: 7, slug: 'growatt-5kw-hybrid-inverter', name: 'Growatt 5kW Hybrid Inverter', price: 580000, image: '/offer.jpg', rating: 4.9, stock: 'In stock' },
-  { id: 8, slug: 'mppt-solar-charge-controller-40a', name: 'MPPT Solar Charge Controller 40A', price: 89999, image: '/offer.jpg', rating: 4.3, stock: 'In stock' },
-  { id: 9, slug: 'lithium-lifepo4-battery-12v-200ah-2', name: 'Lithium LiFePO4 Battery 12V / 200Ah', price: 189999, image: '/offer.jpg', rating: 4.6, stock: 'In stock' },
+// ---------- Types ----------
+interface Product {
+  id: number;
+  name: string;
+  slug?: string;
+  price: number;
+  sale_price?: number | null;
+  image: string;
+  rating?: number;
+  stock_status?: 'in_stock' | 'low_stock' | 'out_of_stock';
+  brand?: string;
+  category?: string;
+}
+
+// ---------- Helper: create slug from product name ----------
+function createSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-');
+}
+
+// ---------- Fallback Data (type‑safe) ----------
+const fallbackProducts: Product[] = [
+  // ... (your fallback products array)
+  { id: 1, name: 'Uthium LiFePO4 Battery 12V / 100Ah', slug: 'uthium-lifepo4-battery-12v-100ah', price: 119999, image: '/offer.jpg', rating: 4.5, stock_status: 'in_stock', brand: 'Uthium' },
+  { id: 2, name: 'Solar Motion Sensor Light (24W)', slug: 'solar-motion-sensor-light-24w', price: 11999, image: '/offer.jpg', rating: 4.2, stock_status: 'in_stock', brand: 'SolarTech' },
+  // ... add all other fallback products
+];
+
+const brandOptions = [
+  'All Brands',
+  ...Array.from(new Set(fallbackProducts.map((p) => p.brand).filter(Boolean))),
 ];
 
 export default function ShopPage() {
+  const router = useRouter();         // ✅ now defined
+  const pathname = usePathname();     // ✅ now defined
+  const [adding, setAdding] = useState<Record<number, boolean>>({}); // ✅ for add-to-cart loading
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // ---------- Filter & Sort State ----------
   const [priceMax, setPriceMax] = useState(1000000);
   const [brand, setBrand] = useState('All Brands');
-  const [applyFilter, setApplyFilter] = useState(false); // to trigger filter on button click
+  const [applyFilter, setApplyFilter] = useState(false);
+  const [sortBy, setSortBy] = useState('default');
 
-  // Filter products
-  const filteredProducts = allProducts.filter((p) => {
-    if (!applyFilter) return true; // show all until filter button clicked
-    const priceMatch = p.price <= priceMax;
-    const brandMatch = brand === 'All Brands' || p.name.includes(brand);
-    return priceMatch && brandMatch;
-  });
+  // ---------- Fetch Products ----------
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await customerApi.products.list();
+        let fetchedProducts = data.data || data.products || [];
+
+        // Normalize product data
+        fetchedProducts = fetchedProducts.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug || createSlug(p.name),
+          price: p.sale_price || p.price,
+          image: p.image || '/offer.jpg',
+          rating: p.rating || 4.5,
+          stock_status: p.stock_status || 'in_stock',
+          brand: p.brand || 'Generic',
+          category: p.category?.name,
+        }));
+
+        setProducts(fetchedProducts);
+      } catch (err: any) {
+        console.error('Failed to fetch products:', err);
+        setError(err?.message || 'Failed to load products');
+        setProducts(fallbackProducts);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // ---------- Apply Filters & Sorting ----------
+  useEffect(() => {
+    let result = [...products];
+
+    if (applyFilter) {
+      // Price filter
+      result = result.filter((p) => p.price <= priceMax);
+      // Brand filter
+      if (brand !== 'All Brands') {
+        result = result.filter((p) => p.brand === brand);
+      }
+    }
+
+    // Sorting
+    switch (sortBy) {
+      case 'price-low-high':
+        result.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-high-low':
+        result.sort((a, b) => b.price - a.price);
+        break;
+      case 'popularity':
+        result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        break;
+      default: break;
+    }
+
+    setFilteredProducts(result);
+  }, [products, applyFilter, priceMax, brand, sortBy]);
+
+  // ---------- Reset filter flag when filters change ----------
+  useEffect(() => {
+    setApplyFilter(false);
+  }, [priceMax, brand]);
+
+  // ✅ Add to Cart Handler
+  async function handleAddToCart(id: number, price: number) {
+    try {
+      setAdding((prev) => ({ ...prev, [id]: true }));
+      await addToCart(id, 1, price);
+      alert('Added to cart ✅');
+    } catch (e: any) {
+      if (e?.message === 'LOGIN_REQUIRED' || e?.message === 'SESSION_EXPIRED') {
+        router.push(`/login?next=${encodeURIComponent(pathname || '/shop')}`);
+        return;
+      }
+      alert(e?.message || 'Failed to add to cart');
+    } finally {
+      setAdding((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
+  // ---------- Loading & Error States ----------
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-[#4EA674]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#EAF8E7]/50">
       <div className="container mx-auto px-4 py-6 md:py-10">
         {/* Breadcrumb */}
-        <div className="text-sm text-gray-600 mb-6 flex items-center gap-2">
+        <div className="text-sm text-gray-600 mb-6 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-[#4EA674]">Home</Link>
           <ChevronRight className="w-4 h-4" />
-          <Link href="/inverters" className="hover:text-[#4EA674]">Inverters</Link>
+          <Link href="/shop" className="hover:text-[#4EA674]">Shop</Link>
           <ChevronRight className="w-4 h-4" />
-          <span className="text-[#4EA674] font-medium">Hybrid Inverters</span>
+          <span className="text-[#4EA674] font-medium">All Products</span>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filters */}
           <aside className="w-full lg:w-80 bg-white rounded-xl p-6 shadow-sm h-fit lg:sticky lg:top-6">
             <h2 className="text-xl font-bold text-gray-800 mb-6">Filter By Price</h2>
-
             <div className="mb-8">
-              <label className="block text-sm text-gray-600 mb-2">Price</label>
+              <label className="block text-sm text-gray-600 mb-2">Price (max)</label>
               <input
                 type="range"
                 min="0"
@@ -61,14 +203,14 @@ export default function ShopPage() {
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#4EA674]"
               />
               <div className="flex justify-between text-sm text-gray-600 mt-2">
-                <span>₦0.00</span>
+                <span>₦0</span>
                 <span>₦{priceMax.toLocaleString()}</span>
               </div>
               <button
                 onClick={() => setApplyFilter(true)}
                 className="w-full mt-4 py-2.5 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3e8c5f] transition"
               >
-                Filter
+                Apply Filter
               </button>
             </div>
 
@@ -78,31 +220,28 @@ export default function ShopPage() {
               onChange={(e) => setBrand(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4EA674] text-gray-700"
             >
-              <option>All Brands</option>
-              <option>Felicity</option>
-              <option>Growatt</option>
-              <option>Deye</option>
-              <option>Luminous</option>
-              <option>Uthium</option>
-              <option>SolarTech</option>
-              <option>MPPT Pro</option>
+              {brandOptions.map((b) => (
+                <option key={b}>{b}</option>
+              ))}
             </select>
           </aside>
 
           {/* Main Product Grid */}
           <main className="flex-1">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-                Hybrid Inverters
-              </h1>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <span>Showing 1 - {filteredProducts.length} / {allProducts.length}</span>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">All Products</h1>
+              <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
+                <span>Showing {filteredProducts.length} / {products.length}</span>
                 <div className="relative">
-                  <select className="appearance-none bg-white border border-gray-300 rounded px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-[#4EA674]">
-                    <option>Default sorting</option>
-                    <option>Price: low to high</option>
-                    <option>Price: high to low</option>
-                    <option>Popularity</option>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="appearance-none bg-white border border-gray-300 rounded px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-[#4EA674]"
+                  >
+                    <option value="default">Default sorting</option>
+                    <option value="price-low-high">Price: low to high</option>
+                    <option value="price-high-low">Price: high to low</option>
+                    <option value="popularity">Popularity</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
                 </div>
@@ -116,55 +255,58 @@ export default function ShopPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
                 {filteredProducts.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition"
-                  >
+                  <div key={p.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
                     <div className="relative pt-[75%]">
-                      <Image src={p.image} alt={p.name} fill className="object-cover" />
+                      <Image src={p.image || '/offer.jpg'} alt={p.name} fill className="object-cover" />
                       <button className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition">
                         <Heart className="w-5 h-5 text-gray-600" />
                       </button>
                     </div>
 
                     <div className="p-4">
-                      <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1">
-                        {p.name}
-                      </h3>
-
+                      <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1">{p.name}</h3>
                       <div className="flex items-center gap-1 mb-2">
                         {[...Array(5)].map((_, i) => (
                           <Star
                             key={i}
                             className={`w-4 h-4 ${
-                              i < Math.floor(p.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                              i < Math.floor(p.rating || 0)
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-gray-300'
                             }`}
                           />
                         ))}
                       </div>
-
                       <p
                         className={`text-xs font-medium mb-2 ${
-                          p.stock === 'In stock' ? 'text-green-600' : 'text-red-600'
+                          p.stock_status === 'in_stock'
+                            ? 'text-green-600'
+                            : p.stock_status === 'low_stock'
+                            ? 'text-orange-600'
+                            : 'text-red-600'
                         }`}
                       >
-                        {p.stock}
+                        {p.stock_status === 'in_stock'
+                          ? 'In stock'
+                          : p.stock_status === 'low_stock'
+                          ? 'Low stock'
+                          : 'Out of stock'}
                       </p>
-
-                      <p className="text-xl font-bold text-[#4EA674] mb-4">
-                        ₦{p.price.toLocaleString()}
-                      </p>
+                      <p className="text-xl font-bold text-[#4EA674] mb-4">₦{p.price.toLocaleString()}</p>
 
                       <div className="flex gap-3">
-                        {/* FIXED: Now links to dynamic slug page */}
                         <Link
-                          href={`/products/${p.slug}`}
+                          href={`/products/${p.slug || createSlug(p.name)}`}
                           className="flex-1 text-center py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-medium hover:bg-[#4EA674]/10 transition"
                         >
                           View Details
                         </Link>
-                        <button className="flex-1 bg-[#4EA674] text-white py-2 rounded-full text-sm font-medium hover:bg-[#3e8c5f] transition">
-                          Add to Cart
+                        <button
+                          onClick={() => handleAddToCart(p.id, p.price)}
+                          disabled={adding[p.id]}
+                          className="flex-1 bg-[#4EA674] text-white py-2 rounded-full text-sm font-medium hover:bg-[#3e8c5f] transition disabled:opacity-60"
+                        >
+                          {adding[p.id] ? 'Adding...' : 'Add to Cart'}
                         </button>
                       </div>
                     </div>
@@ -172,8 +314,6 @@ export default function ShopPage() {
                 ))}
               </div>
             )}
-
-           
           </main>
         </div>
       </div>
