@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Search,
   Bell,
@@ -12,10 +12,9 @@ import {
   ChevronRight,
   Sun,
   Moon,
-} from "lucide-react";
-import { useTheme } from "next-themes";
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
 
-// Recharts imports
 import {
   AreaChart,
   Area,
@@ -24,46 +23,91 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from "recharts";
+} from 'recharts';
 
-// Chart data
+// ---------- Chart Data ----------
 const weeklyData = [
-  { day: "Sun", visitors: 20000 },
-  { day: "Mon", visitors: 22000 },
-  { day: "Tue", visitors: 30000 },
-  { day: "Wed", visitors: 28000 },
-  { day: "Thu", visitors: 25409 },
-  { day: "Fri", visitors: 24000 },
-  { day: "Sat", visitors: 26000 },
+  { day: 'Sun', visitors: 20000 },
+  { day: 'Mon', visitors: 22000 },
+  { day: 'Tue', visitors: 30000 },
+  { day: 'Wed', visitors: 28000 },
+  { day: 'Thu', visitors: 25409 },
+  { day: 'Fri', visitors: 24000 },
+  { day: 'Sat', visitors: 26000 },
 ];
 
+// ---------- Mock Customer Data ----------
 const baseCustomers = [
-  { id: "CUST001", name: "John Doe", phone: "+1234567890", orders: 25, spend: "3,450.00", status: "Active" },
-  { id: "CUST002", name: "Jane Smith", phone: "+1234567890", orders: 5, spend: "250.00", status: "Inactive" },
-  { id: "CUST003", name: "Emily Davis", phone: "+1234567890", orders: 30, spend: "4,600.00", status: "VIP" },
+  { id: 'CUST001', name: 'John Doe', phone: '+1234567890', orders: 25, spend: '3,450.00', status: 'Active' },
+  { id: 'CUST002', name: 'Jane Smith', phone: '+1234567890', orders: 5, spend: '250.00', status: 'Inactive' },
+  { id: 'CUST003', name: 'Emily Davis', phone: '+1234567890', orders: 30, spend: '4,600.00', status: 'VIP' },
 ];
 
-const customers = Array(80).fill(null).flatMap((_, blockIndex) =>
-  baseCustomers.map((cust, i) => ({
-    ...cust,
-    id: `CUST${String(blockIndex * baseCustomers.length + i + 1).padStart(3, "0")}`,
-  }))
+const customers = Array(80)
+  .fill(null)
+  .flatMap((_, blockIndex) =>
+    baseCustomers.map((cust, i) => ({
+      ...cust,
+      id: `CUST${String(blockIndex * baseCustomers.length + i + 1).padStart(3, '0')}`,
+    }))
+  );
+
+// ---------- Loading Skeletons (OUTSIDE component) ----------
+const TableRowSkeleton = () => (
+  <tr className="animate-pulse">
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
+    <td className="px-6 py-5"><div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-24" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
+  </tr>
 );
 
+const MobileCardSkeleton = () => (
+  <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-4 border border-gray-200 dark:border-gray-700 animate-pulse">
+    <div className="flex justify-between items-start mb-3">
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+      </div>
+      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-16" />
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+    </div>
+  </div>
+);
+
+// ---------- Main Component ----------
 export default function CustomersPage() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
   const itemsPerPage = 10;
 
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
     setMounted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalPages = Math.ceil(customers.length / itemsPerPage);
-  const paginatedCustomers = customers.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const paginatedCustomers = customers.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
+  );
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#4EA674]" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
@@ -72,7 +116,7 @@ export default function CustomersPage() {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Customers</h1>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <button 
+          <button
             className="p-2 md:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
             onClick={() => setShowSearch(!showSearch)}
             aria-label="Toggle search"
@@ -94,26 +138,22 @@ export default function CustomersPage() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
 
-          {!mounted ? (
-            <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-700" />
-          ) : (
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              aria-label="Toggle dark mode"
-            >
-              <Sun
-                className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
-                  theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
-                }`}
-              />
-              <Moon
-                className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
-                  theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
-                }`}
-              />
-            </button>
-          )}
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            <Sun
+              className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
+                theme === 'dark' ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'
+              }`}
+            />
+            <Moon
+              className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
+                theme === 'dark' ? 'scale-100 rotate-0 opacity-100' : 'scale-0 -rotate-90 opacity-0'
+              }`}
+            />
+          </button>
 
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
             <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
@@ -140,6 +180,7 @@ export default function CustomersPage() {
         {/* Stats & Overview Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
           <div className="lg:col-span-4 space-y-5">
+            {/* Stats Cards - Static for now, can be connected later */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
               <div className="flex justify-between items-start mb-3">
                 <div>
@@ -216,8 +257,8 @@ export default function CustomersPage() {
               </div>
             </div>
 
-            {/* ✅ FIXED: Added position: relative to prevent SSR dimension error */}
-            <div className="h-64 sm:h-72 lg:h-80" style={{ position: 'relative' }}>
+            {/* Chart - with fixed wrapper */}
+            <div style={{ width: '100%', height: 320, position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklyData}>
                   <defs>
@@ -227,14 +268,24 @@ export default function CustomersPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fill: "#7C7C7C", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "#7C7C7C", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}k`} />
+                  <XAxis dataKey="day" tick={{ fill: '#7C7C7C', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fill: '#7C7C7C', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `${v / 1000}k`}
+                  />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#EAF8E7", border: "none", borderRadius: "12px", padding: "10px 14px" }}
-                    labelStyle={{ color: "#4EA674", fontWeight: "bold" }}
+                    contentStyle={{
+                      backgroundColor: '#EAF8E7',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '10px 14px',
+                    }}
+                    labelStyle={{ color: '#4EA674', fontWeight: 'bold' }}
                     formatter={(value) => [
-                      value != null ? `${(Number(value) / 1000).toFixed(1)}k` : "0k",
-                      "Visitors"
+                      value != null ? `${(Number(value) / 1000).toFixed(1)}k` : '0k',
+                      'Visitors',
                     ]}
                   />
                   <Area
@@ -251,8 +302,9 @@ export default function CustomersPage() {
           </div>
         </div>
 
-        {/* Customers List - Desktop Table */}
+        {/* Customers List */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+          {/* Desktop Table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[800px] text-sm">
               <thead className="bg-[#EAF8E7]">
@@ -275,16 +327,24 @@ export default function CustomersPage() {
                     <td className="px-6 py-5 text-gray-900 dark:text-white">{customer.orders}</td>
                     <td className="px-6 py-5 text-gray-900 dark:text-white font-medium">${customer.spend}</td>
                     <td className="px-6 py-5">
-                      <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-                        customer.status === "Active" ? "bg-[#EAF8E7] text-[#4EA674]" :
-                        customer.status === "VIP" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      }`}>
-                        <span className={`w-2.5 h-2.5 rounded-full ${
-                          customer.status === "Active" ? "bg-[#4EA674]" :
-                          customer.status === "VIP" ? "bg-yellow-700" :
-                          "bg-red-700"
-                        }`} />
+                      <span
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                          customer.status === 'Active'
+                            ? 'bg-[#EAF8E7] text-[#4EA674]'
+                            : customer.status === 'VIP'
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        }`}
+                      >
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full ${
+                            customer.status === 'Active'
+                              ? 'bg-[#4EA674]'
+                              : customer.status === 'VIP'
+                              ? 'bg-yellow-700'
+                              : 'bg-red-700'
+                          }`}
+                        />
                         {customer.status}
                       </span>
                     </td>
@@ -316,11 +376,15 @@ export default function CustomersPage() {
                     <p className="font-medium text-gray-900 dark:text-white">#{customer.id}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-300">{customer.name}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    customer.status === "Active" ? "bg-[#EAF8E7] text-[#4EA674]" :
-                    customer.status === "VIP" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                  }`}>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      customer.status === 'Active'
+                        ? 'bg-[#EAF8E7] text-[#4EA674]'
+                        : customer.status === 'VIP'
+                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}
+                  >
                     {customer.status}
                   </span>
                 </div>
@@ -355,7 +419,7 @@ export default function CustomersPage() {
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 sm:mt-8">
             <button
-              onClick={() => setPage(Math.max(1, page - 1))}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
             >
@@ -365,7 +429,6 @@ export default function CustomersPage() {
             <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
               {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
                 let pageNum = i + 1;
-
                 if (totalPages > 7) {
                   if (page <= 4) {
                     pageNum = i + 1;
@@ -379,17 +442,15 @@ export default function CustomersPage() {
                     else pageNum = page - 3 + i;
                   }
                 }
-
                 if (pageNum > totalPages || pageNum < 1) return null;
-
                 return (
                   <button
                     key={pageNum}
                     onClick={() => setPage(pageNum)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium min-w-[36px] transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium min-w-[36px] ${
                       page === pageNum
-                        ? "bg-[#C1E6BA] text-[#4EA674] font-bold"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        ? 'bg-[#C1E6BA] text-[#4EA674] font-bold'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     {pageNum}
@@ -399,7 +460,7 @@ export default function CustomersPage() {
             </div>
 
             <button
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
             >

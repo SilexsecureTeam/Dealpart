@@ -213,16 +213,33 @@ const mockFetchCountrySales = (): Promise<CountrySales[]> => {
   });
 };
 
-// ---------- HELPER ----------
-const formatCurrency = (amount: number) => {
-  return `₦${amount.toLocaleString()}`;
-};
-
+// ---------- HELPERS ----------
+const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
 const formatCompact = (num: number) => {
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toString();
 };
 
+// ---------- LOADING SKELETONS (OUTSIDE component) ----------
+const SkeletonCard = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm animate-pulse">
+    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4" />
+    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-6" />
+    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+  </div>
+);
+
+const SkeletonTableRow = () => (
+  <tr className="animate-pulse">
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-6" /></td>
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" /></td>
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto" /></td>
+  </tr>
+);
+
+// ---------- MAIN COMPONENT ----------
 export default function AdminDashboard() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -230,12 +247,9 @@ export default function AdminDashboard() {
 
   // ---------- STATE ----------
   const [admin, setAdmin] = useState<AdminUser | null>(null);
-
-  // Filters
   const [transactionFilter, setTransactionFilter] = useState<string>('All');
   const [bestSellingFilter, setBestSellingFilter] = useState<string>('All');
 
-  // Loading states
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loadingWeeklyStats, setLoadingWeeklyStats] = useState(true);
   const [loadingChart, setLoadingChart] = useState(true);
@@ -246,7 +260,6 @@ export default function AdminDashboard() {
   const [loadingLiveUsers, setLoadingLiveUsers] = useState(true);
   const [loadingCountrySales, setLoadingCountrySales] = useState(true);
 
-  // Data states
   const [summary, setSummary] = useState<SummaryStats | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStat | null>(null);
   const [weeklySales, setWeeklySales] = useState<{ day: string; sales: number }[]>([]);
@@ -258,15 +271,12 @@ export default function AdminDashboard() {
   const [countrySales, setCountrySales] = useState<CountrySales[]>([]);
 
   // ---------- FILTERED DATA ----------
-  const filteredTransactions = transactions.filter((t) => {
-    if (transactionFilter === 'All') return true;
-    return t.status === transactionFilter;
-  });
-
-  const filteredBestSelling = bestSelling.filter((p) => {
-    if (bestSellingFilter === 'All') return true;
-    return p.status === bestSellingFilter;
-  });
+  const filteredTransactions = transactions.filter((t) =>
+    transactionFilter === 'All' ? true : t.status === transactionFilter
+  );
+  const filteredBestSelling = bestSelling.filter((p) =>
+    bestSellingFilter === 'All' ? true : p.status === bestSellingFilter
+  );
 
   // ---------- AUTH CHECK & LOAD ADMIN ----------
   useEffect(() => {
@@ -276,7 +286,6 @@ export default function AdminDashboard() {
       router.push('/admin/login');
       return;
     }
-
     const user = localStorage.getItem('adminUser');
     if (user) {
       try {
@@ -319,7 +328,7 @@ export default function AdminDashboard() {
         setTransactions(transactionsData);
         setBestSelling(bestSellingData);
         setTopProducts(topProductsData);
-        setCategories(categoriesData.slice(0, 3)); // show only first 3
+        setCategories(categoriesData.slice(0, 3));
         setLiveUsers(liveUsersData);
         setCountrySales(countrySalesData);
       } catch (error) {
@@ -337,72 +346,33 @@ export default function AdminDashboard() {
       }
     };
 
-    if (mounted) {
-      fetchAll();
-    }
+    if (mounted) fetchAll();
   }, [mounted]);
 
   // ---------- HANDLERS ----------
-  const handleDetailsClick = (path: string) => {
-    router.push(`/admin/${path}`);
-  };
-
-  const handleAddCategory = () => {
-    router.push('/admin/categories');
-  };
-
-  const handleAddToCart = (productId: number) => {
-    alert(`Add product ${productId} to cart (coming soon)`);
-  };
-
-  const handleSeeMoreCategories = () => {
-    router.push('/admin/categories');
-  };
-
-  const handleSeeMoreProducts = () => {
-    router.push('/admin/product/add');
-  };
-
-  const handleViewInsight = () => {
-    router.push('/admin/analytics');
-  };
-
-  // ---------- LOADING SKELETONS ----------
-  const SkeletonCard = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm animate-pulse">
-      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
-      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-6"></div>
-      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-    </div>
-  );
-
-  const SkeletonTableRow = () => (
-    <tr className="animate-pulse">
-      <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-6"></div></td>
-      <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div></td>
-      <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div></td>
-      <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div></td>
-      <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto"></div></td>
-    </tr>
-  );
+  const handleDetailsClick = (path: string) => router.push(`/admin/${path}`);
+  const handleAddCategory = () => router.push('/admin/categories');
+  const handleAddToCart = (productId: number) => alert(`Add product ${productId} to cart (coming soon)`);
+  const handleSeeMoreCategories = () => router.push('/admin/categories');
+  const handleSeeMoreProducts = () => router.push('/admin/product/add');
+  const handleViewInsight = () => router.push('/admin/analytics');
 
   // ---------- RENDER ----------
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#4EA674]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#4EA674]" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header */}
+      {/* ---------- Header ---------- */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
 
         <div className="flex items-center gap-3">
-          {/* Search */}
           <div className="relative hidden md:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -415,13 +385,11 @@ export default function AdminDashboard() {
             <Search className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
 
-          {/* Bell */}
           <button className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
 
-          {/* Dark mode toggle */}
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="relative p-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -439,7 +407,6 @@ export default function AdminDashboard() {
             />
           </button>
 
-          {/* Avatar & Admin Info */}
           <div className="flex items-center gap-3">
             <div className="hidden md:block text-right">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -463,121 +430,119 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* ---------- Main content ---------- */}
       <main className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 bg-gray-50 dark:bg-gray-950">
         {/* Top Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Total Sales */}
           {loadingSummary ? (
-            <SkeletonCard />
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-bold">Total Sales</h3>
-                  <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-1">Last 7 days</p>
-                </div>
-                <MoreVertical className="w-5 h-5 text-gray-400" />
-              </div>
-              <div className="mb-6">
-                <div className="flex items-end gap-4">
-                  <p className="text-4xl font-bold text-[#4EA674]">
-                    {formatCompact(summary?.totalSales || 0)}
-                  </p>
-                  <p className={`text-lg font-bold flex items-center gap-1 pb-1 ${
-                    (summary?.salesGrowth || 0) >= 0 ? 'text-[#4EA674]' : 'text-[#F43443]'
-                  }`}>
-                    {(summary?.salesGrowth || 0) >= 0 ? '↑' : '↓'} {Math.abs(summary?.salesGrowth || 0)}%
-                  </p>
-                </div>
-                <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-2">
-                  Previous 7days ({formatCurrency(summary?.previousTotalSales || 0)})
-                </p>
-              </div>
-              <button
-                onClick={() => handleDetailsClick('sales')}
-                className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-[#4EA674] hover:text-white transition-all"
-              >
-                Details
-              </button>
-            </div>
-          )}
-
-          {/* Total Orders */}
-          {loadingSummary ? (
-            <SkeletonCard />
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-bold">Total Orders</h3>
-                  <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-1">Last 7 days</p>
-                </div>
-                <MoreVertical className="w-5 h-5 text-gray-400" />
-              </div>
-              <div className="mb-6">
-                <div className="flex items-end gap-4">
-                  <p className="text-4xl font-bold text-[#4EA674]">
-                    {formatCompact(summary?.totalOrders || 0)}
-                  </p>
-                  <p className={`text-lg font-bold flex items-center gap-1 pb-1 ${
-                    (summary?.ordersGrowth || 0) >= 0 ? 'text-[#4EA674]' : 'text-[#F43443]'
-                  }`}>
-                    {(summary?.ordersGrowth || 0) >= 0 ? '↑' : '↓'} {Math.abs(summary?.ordersGrowth || 0)}%
-                  </p>
-                </div>
-                <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-2">
-                  Previous 7days ({formatCompact(summary?.previousTotalOrders || 0)})
-                </p>
-              </div>
-              <button
-                onClick={() => handleDetailsClick('orders')}
-                className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-[#4EA674] hover:text-white transition-all"
-              >
-                Details
-              </button>
-            </div>
-          )}
-
-          {/* Pending & Canceled */}
-          {loadingSummary ? (
-            <SkeletonCard />
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-bold">Pending & Canceled</h3>
-                  <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-1">Last 7 days</p>
-                </div>
-                <MoreVertical className="w-5 h-5 text-gray-400" />
-              </div>
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Pending</p>
-                  <div className="flex items-baseline gap-3">
-                    <p className="text-4xl font-bold text-[#4EA674]">{summary?.pendingOrders || 0}</p>
-                    <p className="text-lg font-medium text-[#4EA674]">user {summary?.pendingGrowth || 0}%</p>
+            <>
+              {/* Total Sales */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold">Total Sales</h3>
+                    <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-1">Last 7 days</p>
                   </div>
+                  <MoreVertical className="w-5 h-5 text-gray-400" />
                 </div>
-                <div className="border-l border-gray-200 dark:border-gray-700 pl-8">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Canceled</p>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-4xl font-bold text-[#F43443]">{summary?.canceledOrders || 0}</p>
-                    <p className={`text-lg font-bold flex items-center gap-1 ${
-                      (summary?.canceledGrowth || 0) <= 0 ? 'text-[#F43443]' : 'text-[#4EA674]'
+                <div className="mb-6">
+                  <div className="flex items-end gap-4">
+                    <p className="text-4xl font-bold text-[#4EA674]">
+                      {formatCompact(summary?.totalSales || 0)}
+                    </p>
+                    <p className={`text-lg font-bold flex items-center gap-1 pb-1 ${
+                      (summary?.salesGrowth || 0) >= 0 ? 'text-[#4EA674]' : 'text-[#F43443]'
                     }`}>
-                      {(summary?.canceledGrowth || 0) <= 0 ? '↓' : '↑'} {Math.abs(summary?.canceledGrowth || 0)}%
+                      {(summary?.salesGrowth || 0) >= 0 ? '↑' : '↓'} {Math.abs(summary?.salesGrowth || 0)}%
                     </p>
                   </div>
+                  <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-2">
+                    Previous 7days ({formatCurrency(summary?.previousTotalSales || 0)})
+                  </p>
                 </div>
+                <button
+                  onClick={() => handleDetailsClick('sales')}
+                  className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-[#4EA674] hover:text-white transition-all"
+                >
+                  Details
+                </button>
               </div>
-              <button
-                onClick={() => handleDetailsClick('orders?status=pending,canceled')}
-                className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-[#4EA674] hover:text-white transition-all"
-              >
-                Details
-              </button>
-            </div>
+
+              {/* Total Orders */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold">Total Orders</h3>
+                    <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-1">Last 7 days</p>
+                  </div>
+                  <MoreVertical className="w-5 h-5 text-gray-400" />
+                </div>
+                <div className="mb-6">
+                  <div className="flex items-end gap-4">
+                    <p className="text-4xl font-bold text-[#4EA674]">
+                      {formatCompact(summary?.totalOrders || 0)}
+                    </p>
+                    <p className={`text-lg font-bold flex items-center gap-1 pb-1 ${
+                      (summary?.ordersGrowth || 0) >= 0 ? 'text-[#4EA674]' : 'text-[#F43443]'
+                    }`}>
+                      {(summary?.ordersGrowth || 0) >= 0 ? '↑' : '↓'} {Math.abs(summary?.ordersGrowth || 0)}%
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-2">
+                    Previous 7days ({formatCompact(summary?.previousTotalOrders || 0)})
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDetailsClick('orders')}
+                  className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-[#4EA674] hover:text-white transition-all"
+                >
+                  Details
+                </button>
+              </div>
+
+              {/* Pending & Canceled */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold">Pending & Canceled</h3>
+                    <p className="text-sm text-[#7C7C7C] dark:text-gray-400 mt-1">Last 7 days</p>
+                  </div>
+                  <MoreVertical className="w-5 h-5 text-gray-400" />
+                </div>
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Pending</p>
+                    <div className="flex items-baseline gap-3">
+                      <p className="text-4xl font-bold text-[#4EA674]">{summary?.pendingOrders || 0}</p>
+                      <p className="text-lg font-medium text-[#4EA674]">user {summary?.pendingGrowth || 0}%</p>
+                    </div>
+                  </div>
+                  <div className="border-l border-gray-200 dark:border-gray-700 pl-8">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Canceled</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-4xl font-bold text-[#F43443]">{summary?.canceledOrders || 0}</p>
+                      <p className={`text-lg font-bold flex items-center gap-1 ${
+                        (summary?.canceledGrowth || 0) <= 0 ? 'text-[#F43443]' : 'text-[#4EA674]'
+                      }`}>
+                        {(summary?.canceledGrowth || 0) <= 0 ? '↓' : '↑'} {Math.abs(summary?.canceledGrowth || 0)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDetailsClick('orders?status=pending,canceled')}
+                  className="w-full py-3 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-bold hover:bg-[#4EA674] hover:text-white transition-all"
+                >
+                  Details
+                </button>
+              </div>
+            </>
           )}
         </div>
 
@@ -602,8 +567,8 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 mb-10 animate-pulse">
                 {[...Array(5)].map((_, i) => (
                   <div key={i} className="text-center">
-                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 mx-auto mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 mx-auto"></div>
+                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 mx-auto mb-2" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 mx-auto" />
                   </div>
                 ))}
               </div>
@@ -644,7 +609,7 @@ export default function AdminDashboard() {
             )}
 
             {loadingChart ? (
-              <div className="w-full h-80 bg-gray-100 dark:bg-gray-700 animate-pulse rounded-xl"></div>
+              <div className="w-full h-80 bg-gray-100 dark:bg-gray-700 animate-pulse rounded-xl" />
             ) : (
               <div style={{ width: '100%', height: 320, position: 'relative' }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -694,12 +659,12 @@ export default function AdminDashboard() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
             {loadingLiveUsers ? (
               <div className="animate-pulse space-y-6">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
                 <div className="flex items-end gap-1 h-24 mt-4">
                   {[...Array(20)].map((_, i) => (
-                    <div key={i} className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-t-md h-12"></div>
+                    <div key={i} className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-t-md h-12" />
                   ))}
                 </div>
               </div>
@@ -711,31 +676,26 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Users per minute</p>
                   <div className="flex items-end gap-1 h-24">
                     {liveUsers?.activity.map((h, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 bg-[#4EA674] rounded-t-md"
-                        style={{ height: `${h}%` }}
-                      />
+                      <div key={i} className="flex-1 bg-[#4EA674] rounded-t-md" style={{ height: `${h}%` }} />
                     ))}
                   </div>
                 </div>
-
                 <div className="border-t border-gray-200 dark:border-gray-700 my-8" />
               </>
             )}
 
             {loadingCountrySales ? (
               <div className="animate-pulse space-y-4 mt-8">
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full" />
                     <div className="flex-1">
                       <div className="flex justify-between mb-1">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" />
                       </div>
-                      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full w-full"></div>
+                      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full w-full" />
                     </div>
                   </div>
                 ))}
@@ -791,7 +751,6 @@ export default function AdminDashboard() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-8">
                 <h3 className="text-xl font-bold">Transaction</h3>
-                {/* Filter Dropdown */}
                 <div className="relative">
                   <select
                     value={transactionFilter}
@@ -877,7 +836,6 @@ export default function AdminDashboard() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">Best selling product</h3>
-                {/* Filter Dropdown */}
                 <div className="relative">
                   <select
                     value={bestSellingFilter}
@@ -912,12 +870,12 @@ export default function AdminDashboard() {
                       [...Array(4)].map((_, i) => (
                         <tr key={i} className="animate-pulse">
                           <td className="py-6 flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32" />
                           </td>
-                          <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div></td>
-                          <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div></td>
-                          <td className="py-6 text-right"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto"></div></td>
+                          <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" /></td>
+                          <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
+                          <td className="py-6 text-right"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto" /></td>
                         </tr>
                       ))
                     ) : filteredBestSelling.length === 0 ? (
@@ -994,12 +952,12 @@ export default function AdminDashboard() {
                 {loadingTopProducts ? (
                   [...Array(4)].map((_, i) => (
                     <div key={i} className="flex items-center gap-4 animate-pulse">
-                      <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                      <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg" />
                       <div className="flex-1">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2"></div>
-                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2" />
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24" />
                       </div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
                     </div>
                   ))
                 ) : (
@@ -1046,10 +1004,10 @@ export default function AdminDashboard() {
                     [...Array(3)].map((_, i) => (
                       <div key={i} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl animate-pulse">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32" />
                         </div>
-                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
                       </div>
                     ))
                   ) : (
@@ -1090,13 +1048,13 @@ export default function AdminDashboard() {
                     [...Array(3)].map((_, i) => (
                       <div key={i} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl animate-pulse">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
                           <div>
-                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2"></div>
-                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2" />
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16" />
                           </div>
                         </div>
-                        <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                        <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded-full" />
                       </div>
                     ))
                   ) : (

@@ -10,7 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Moon,
-  Plus,
   Loader2,
   X,
 } from "lucide-react";
@@ -72,7 +71,6 @@ const useTransactions = (page: number, limit: number, filter: FilterType, search
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 500);
@@ -110,7 +108,7 @@ const useTransactions = (page: number, limit: number, filter: FilterType, search
 // ---------- Helpers ----------
 const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
 
-// ---------- Loading Skeletons ----------
+// ---------- Loading Skeletons (OUTSIDE component) ----------
 const StatCardSkeleton = () => (
   <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm animate-pulse">
     <div className="flex justify-between items-start mb-4">
@@ -173,22 +171,26 @@ export default function TransactionPage() {
     }
   }, [message]);
 
-  // Show errors in toast
+  // Show errors in toast – dependencies are stable, so we disable lint
   useEffect(() => {
     if (statsError) setMessage({ type: "error", text: statsError });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statsError]);
 
   useEffect(() => {
     if (transactionsError) setMessage({ type: "error", text: transactionsError });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsError]);
 
   useEffect(() => {
     setMounted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reset page when filter or search changes
   useEffect(() => {
     setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, searchQuery]);
 
   if (!mounted) {
