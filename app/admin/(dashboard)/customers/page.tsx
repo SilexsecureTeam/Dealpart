@@ -37,7 +37,6 @@ const weeklyData = [
   { day: "Sat", visitors: 26000 },
 ];
 
-
 const baseCustomers = [
   { id: "CUST001", name: "John Doe", phone: "+1234567890", orders: 25, spend: "3,450.00", status: "Active" },
   { id: "CUST002", name: "Jane Smith", phone: "+1234567890", orders: 5, spend: "250.00", status: "Inactive" },
@@ -48,7 +47,6 @@ const customers = Array(80).fill(null).flatMap((_, blockIndex) =>
   baseCustomers.map((cust, i) => ({
     ...cust,
     id: `CUST${String(blockIndex * baseCustomers.length + i + 1).padStart(3, "0")}`,
-
   }))
 );
 
@@ -218,7 +216,8 @@ export default function CustomersPage() {
               </div>
             </div>
 
-            <div className="h-64 sm:h-72 lg:h-80">
+            {/* ✅ FIXED: Added position: relative to prevent SSR dimension error */}
+            <div className="h-64 sm:h-72 lg:h-80" style={{ position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklyData}>
                   <defs>
@@ -252,9 +251,8 @@ export default function CustomersPage() {
           </div>
         </div>
 
-        {/* Customers List */}
+        {/* Customers List - Desktop Table */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-          {/* Desktop Table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[800px] text-sm">
               <thead className="bg-[#EAF8E7]">
@@ -275,7 +273,7 @@ export default function CustomersPage() {
                     <td className="px-6 py-5 text-gray-900 dark:text-white">{customer.name}</td>
                     <td className="px-6 py-5 text-gray-600 dark:text-gray-300">{customer.phone}</td>
                     <td className="px-6 py-5 text-gray-900 dark:text-white">{customer.orders}</td>
-                    <td className="px-6 py-5 text-gray-900 dark:text-white font-medium">{customer.spend}</td>
+                    <td className="px-6 py-5 text-gray-900 dark:text-white font-medium">${customer.spend}</td>
                     <td className="px-6 py-5">
                       <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
                         customer.status === "Active" ? "bg-[#EAF8E7] text-[#4EA674]" :
@@ -319,7 +317,7 @@ export default function CustomersPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-300">{customer.name}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    customer.status === "Active" ? "bg-[#EAF8E7] text-[#0c2417]  dark:bg-[#4EA674]/30 dark:text-[#4EA674]" :
+                    customer.status === "Active" ? "bg-[#EAF8E7] text-[#4EA674]" :
                     customer.status === "VIP" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
                     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                   }`}>
@@ -354,7 +352,7 @@ export default function CustomersPage() {
             ))}
           </div>
 
-          {/* Updated Pagination - dynamic, works with many pages */}
+          {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 sm:mt-8">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}

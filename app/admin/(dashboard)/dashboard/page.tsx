@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  TrendingUp,
-  TrendingDown,
   MoreVertical,
   Search,
   Bell,
@@ -648,45 +646,47 @@ export default function AdminDashboard() {
             {loadingChart ? (
               <div className="w-full h-80 bg-gray-100 dark:bg-gray-700 animate-pulse rounded-xl"></div>
             ) : (
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={weeklySales} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#C1E6BA" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#C1E6BA" stopOpacity={0.1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fill: '#7C7C7C', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis
-                    tick={{ fill: '#7C7C7C', fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `${v / 1000}k`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#EAF8E7',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                    }}
-                    labelStyle={{ color: '#4EA674', fontWeight: 'bold' }}
-                    formatter={(value) => [`${(Number(value) / 1000).toFixed(1)}k`, 'Sales']}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="#4EA674"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorFill)"
-                    dot={{ fill: '#4EA674', r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div style={{ width: '100%', height: 320, position: 'relative' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weeklySales} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#C1E6BA" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#C1E6BA" stopOpacity={0.1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fill: '#7C7C7C', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tick={{ fill: '#7C7C7C', fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v) => `${v / 1000}k`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#EAF8E7',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                      }}
+                      labelStyle={{ color: '#4EA674', fontWeight: 'bold' }}
+                      formatter={(value) => [`${(Number(value) / 1000).toFixed(1)}k`, 'Sales']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="sales"
+                      stroke="#4EA674"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorFill)"
+                      dot={{ fill: '#4EA674', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
 
@@ -1024,7 +1024,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Add New Product */}
+            {/* Add New Category */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">Add New Category</h3>

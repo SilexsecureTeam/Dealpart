@@ -37,7 +37,6 @@ const weeklyData = [
   { day: "Sat", visitors: 26000 },
 ];
 
-
 const baseCustomers = [
   { id: "CUST001", name: "John Doe", phone: "+1234567890", orders: 25, spend: "3,450.00", status: "Active" },
   { id: "CUST002", name: "Jane Smith", phone: "+1234567890", orders: 5, spend: "250.00", status: "Inactive" },
@@ -48,7 +47,6 @@ const customers = Array(80).fill(null).flatMap((_, blockIndex) =>
   baseCustomers.map((cust, i) => ({
     ...cust,
     id: `CUST${String(blockIndex * baseCustomers.length + i + 1).padStart(3, "0")}`,
-
   }))
 );
 
@@ -218,7 +216,8 @@ export default function CustomersPage() {
               </div>
             </div>
 
-            <div className="h-64 sm:h-72 lg:h-80">
+            {/* ✅ FIXED: Explicit dimensions + position relative */}
+            <div className="h-64 sm:h-72 lg:h-80" style={{ position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklyData}>
                   <defs>
