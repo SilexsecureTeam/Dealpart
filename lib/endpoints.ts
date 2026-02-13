@@ -25,6 +25,8 @@ export const AdminEndpoints = {
   transactions: `${API_BASE}/api/admin/transactions`,
   transactionStats: `${API_BASE}/api/transactions/stats`,
   transactionDetail: (id: number | string) => `${API_BASE}/api/transactions/${id}`,
+users: `${API_BASE}/api/admin/users`,
+userDetail: (id: number | string) => `${API_BASE}/api/admin/users/${id}`,
 
 } as const;
 
@@ -40,6 +42,11 @@ export const CustomerEndpoints = {
   cartAdd: `${API_BASE}/api/cart/add`,
   cartUpdate: (id: number | string) => `${API_BASE}/api/cart/${id}`,
   cartRemove: (id: number | string) => `${API_BASE}/api/cart/${id}`,
+  checkout: `${API_BASE}/api/checkout`,
+verifyPayment: `${API_BASE}/api/verify-payment`,
+coupons: `${API_BASE}/api/coupons`,
+wishlist: `${API_BASE}/api/wishlist`,
+wishlistItem: (id: number | string) => `${API_BASE}/api/wishlist/${id}`,
 } as const;
 
 

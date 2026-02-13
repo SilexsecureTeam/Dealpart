@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import Link from "next/link";
 import Image from "next/image";
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { customerApi } from "@/lib/customerApiClient"; // ✅ unified customer client
+import { customerApi } from "@/lib/customerApiClient";
 import { getCart, calcCartSummary, onCartUpdated } from "@/lib/cart";
 
 export default function PublicHeader() {
@@ -30,7 +30,7 @@ export default function PublicHeader() {
 
   const nextParam = encodeURIComponent(pathname || "/");
 
-  // --- auth check (replaces isUserLoggedIn) ---
+  // --- auth check ---
   useEffect(() => {
     const checkAuth = () => {
       if (typeof window === "undefined") return false;
@@ -38,7 +38,6 @@ export default function PublicHeader() {
     };
     setIsLoggedIn(checkAuth());
 
-    // Listen for changes in other tabs/windows
     const handleStorage = () => setIsLoggedIn(checkAuth());
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
@@ -74,9 +73,9 @@ export default function PublicHeader() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // --- logout (replaces clearUserSession) ---
+  // --- logout ---
   function logout() {
-    customerApi.auth.logout(); // ✅ removes customerToken & customerUser
+    customerApi.auth.logout();
     setIsLoggedIn(false);
     setUserMenuOpen(false);
     router.push(`/login?next=${encodeURIComponent("/")}`);
@@ -169,9 +168,14 @@ export default function PublicHeader() {
               </div>
             )}
 
-            <button className="p-2 hover:bg-gray-100 rounded-full">
+            {/* 🔥 FIXED: Wishlist link instead of static button */}
+            <Link
+              href="/wishlist"
+              className="p-2 hover:bg-gray-100 rounded-full"
+              title="Wishlist"
+            >
               <Heart className="w-6 h-6 text-gray-700" />
-            </button>
+            </Link>
 
             <Link
               href="/cart"

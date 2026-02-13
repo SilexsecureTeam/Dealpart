@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ChangeEvent } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Bell,
@@ -14,7 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { api } from "@/lib/apiClient"; // ✅ admin api client
+import { useCreateProduct, type CreateProductPayload } from "@/hooks/useProducts";
+import { api } from "@/lib/apiClient";
 
 type Category = {
   id: number;
@@ -28,10 +30,13 @@ type Category = {
 };
 
 export default function AddProductPage() {
+  const router = useRouter();
   const [currency, setCurrency] = useState("US");
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   // Form states
-  const [productName, setProductName] = useState('Lithium LifePO4Battery 12 / 100Ah');
+  const [productName, setProductName] = useState('Lithium LiFePO4 Battery 12 / 100Ah');
   const [description, setDescription] = useState(
     'Upgrade your energy storage with this high-performance 12V 100Ah Lithium Iron Phosphate (LiFePO4) battery. Designed as a superior drop-in replacement for traditional lead-acid batteries, it delivers consistent power, significantly longer lifespan, and cutting-edge safety features in a package that weighs half as much.'
   );
@@ -45,33 +50,31 @@ export default function AddProductPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Categories dropdown
+  // Categories
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
   const [catLoading, setCatLoading] = useState(false);
 
-  // Images + validation
+  // Colors
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const colorOptions = ['#90EE90', '#FFB6C1', '#D3D3D3', '#000000', '#FFD700'];
+
+  // Images
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
 
-  // General form errors
+  // Form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Request state
-  const [submitting, setSubmitting] = useState(false);
+  const [pageMsg, setPageMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Mobile search
   const [showSearch, setShowSearch] = useState(false);
 
-  // Page message
-  const [pageMsg, setPageMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // ✅ React Query mutation
+  const createProduct = useCreateProduct();
 
-  // Dark mode
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  // ✅ Fetch categories using admin API client
+  // Fetch categories
   async function fetchCategories() {
     setCatLoading(true);
     try {
@@ -124,6 +127,15 @@ export default function AddProductPage() {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Color selection toggle
+  const toggleColor = (color: string) => {
+    setSelectedColors(prev =>
+      prev.includes(color)
+        ? prev.filter(c => c !== color)
+        : [...prev, color]
+    );
+  };
+
   // Form validation
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -165,37 +177,46 @@ export default function AddProductPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ Publish product using admin API client
+  // ✅ Handle publish with React Query mutation
   const handlePublish = async () => {
     setPageMsg(null);
-
     if (!validateForm()) {
       setPageMsg({ type: "error", text: "Please fix the errors in the form." });
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append("name", productName.trim());
-      formData.append("description", description.trim());
-      formData.append("sale_price_inc_tax", price);
-      if (discountedPrice.trim()) formData.append("sale_price", discountedPrice);
-      if (categoryId) formData.append("category_id", categoryId);
-      if (!unlimitedStock && stockQuantity.trim()) formData.append("stock_quantity", stockQuantity);
-      imageFiles.forEach((file, idx) => formData.append(`images[${idx}]`, file));
+    // Build payload
+    const payload: CreateProductPayload = {
+      name: productName.trim(),
+      description: description.trim(),
+      sales_price_inc_tax: price,
+      sale_price: discountedPrice.trim() ? discountedPrice : undefined,
+      category_id: categoryId || undefined,
+      stock_quantity: unlimitedStock ? undefined : stockQuantity,
+      images: imageFiles,
+      colours: selectedColors,
+      customize: true, // Set to true if you add customization UI later
+    };
 
-      const json = await api.products.create(formData);
-      setPageMsg({ type: "success", text: json?.message || "Product created successfully!" });
+    try {
+      await createProduct.mutateAsync(payload);
+      setPageMsg({ type: "success", text: "Product created successfully!" });
+      
+      // Redirect to product list after 1.5 seconds
+      setTimeout(() => {
+        router.push('/admin/product/list');
+      }, 1500);
     } catch (e: any) {
-      setPageMsg({ type: "error", text: e?.message || "Network error creating product." });
-    } finally {
-      setSubmitting(false);
+      setPageMsg({ 
+        type: "error", 
+        text: e?.message || "Failed to create product. Please try again." 
+      });
     }
   };
 
   const handleSaveDraft = () => {
     setPageMsg({ type: "success", text: "Draft saved!" });
+    // In a real app, you'd save to localStorage or send a draft API call
   };
 
   if (!mounted) {
@@ -301,15 +322,15 @@ export default function AddProductPage() {
             </div>
             <button
               onClick={handlePublish}
-              disabled={submitting}
+              disabled={createProduct.isPending}
               className="px-6 py-3 bg-[#4EA674] text-white rounded-xl font-medium hover:bg-[#3D8B59] transition disabled:opacity-50"
               type="button"
             >
-              {submitting ? "Publishing..." : "Publish Product"}
+              {createProduct.isPending ? "Publishing..." : "Publish Product"}
             </button>
             <button
               onClick={handleSaveDraft}
-              disabled={submitting}
+              disabled={createProduct.isPending}
               className="px-6 py-3 border border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674] hover:text-white transition disabled:opacity-50"
               type="button"
             >
@@ -522,8 +543,9 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* Right Sidebar - Image Upload with Validation */}
+          {/* Right Sidebar */}
           <div className="space-y-8">
+            {/* Image Upload */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Upload Product Image</h3>
               <div className="space-y-6">
@@ -599,21 +621,31 @@ export default function AddProductPage() {
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg opacity-60 cursor-not-allowed"
                     disabled
                   >
-                    <option>Tag endpoint not available yet</option>
+                    <option>Tag endpoint not available now</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Select your color</label>
                   <div className="flex gap-3 flex-wrap">
-                    {['#90EE90', '#FFB6C1', '#D3D3D3', '#000000', '#FFD700'].map((c, i) => (
+                    {colorOptions.map((color, i) => (
                       <button
                         key={i}
-                        className="w-10 h-10 rounded-full border-2 border-gray-200 hover:scale-110 transition"
-                        style={{ backgroundColor: c }}
+                        onClick={() => toggleColor(color)}
+                        className={`w-10 h-10 rounded-full border-2 transition-all ${
+                          selectedColors.includes(color)
+                            ? 'border-[#4EA674] scale-110 ring-2 ring-[#4EA674]/30'
+                            : 'border-gray-200 hover:scale-110'
+                        }`}
+                        style={{ backgroundColor: color }}
                         type="button"
                       />
                     ))}
                   </div>
+                  {selectedColors.length > 0 && (
+                    <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                      Selected: {selectedColors.join(', ')}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -624,7 +656,7 @@ export default function AddProductPage() {
         <div className="flex justify-end gap-4 mt-12">
           <button
             onClick={handleSaveDraft}
-            disabled={submitting}
+            disabled={createProduct.isPending}
             className="px-8 py-3.5 border border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674] hover:text-white transition disabled:opacity-50"
             type="button"
           >
@@ -632,11 +664,11 @@ export default function AddProductPage() {
           </button>
           <button
             onClick={handlePublish}
-            disabled={submitting}
+            disabled={createProduct.isPending}
             className="px-8 py-3.5 bg-[#4EA674] text-white rounded-xl font-medium hover:bg-[#3D8B59] transition disabled:opacity-50"
             type="button"
           >
-            {submitting ? "Publishing..." : "Publish Product"}
+            {createProduct.isPending ? "Publishing..." : "Publish Product"}
           </button>
         </div>
       </main>

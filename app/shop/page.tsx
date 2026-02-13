@@ -3,39 +3,22 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation'; // ✅ added
+import { useRouter, usePathname } from 'next/navigation';
 import { Heart, Star, ChevronRight, ChevronDown, Loader2, X } from 'lucide-react';
-import { customerApi } from '@/lib/customerApiClient';
-import { addToCart } from '@/lib/cart'; // ✅ added
+import { addToCart } from '@/lib/cart';
+import { useCustomerProducts, createSlug, type CustomerProduct } from '@/hooks/useCustomerProducts';
+import { useWishlist, useAddToWishlist, useRemoveFromWishlist } from '@/hooks/useWishlist';
 
-// ---------- Types ----------
-interface Product {
-  id: number;
-  name: string;
-  slug?: string;
-  price: number;
-  sale_price?: number | null;
-  image: string;
-  rating?: number;
-  stock_status?: 'in_stock' | 'low_stock' | 'out_of_stock';
-  brand?: string;
-  category?: string;
-}
-
-// ---------- Helper: create slug from product name ----------
-function createSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-');
-}
-
-// ---------- Fallback Data (type‑safe) ----------
-const fallbackProducts: Product[] = [
-  // ... (your fallback products array)
+// ---------- Fallback Products (if API fails) ----------
+const fallbackProducts: CustomerProduct[] = [
   { id: 1, name: 'Uthium LiFePO4 Battery 12V / 100Ah', slug: 'uthium-lifepo4-battery-12v-100ah', price: 119999, image: '/offer.jpg', rating: 4.5, stock_status: 'in_stock', brand: 'Uthium' },
   { id: 2, name: 'Solar Motion Sensor Light (24W)', slug: 'solar-motion-sensor-light-24w', price: 11999, image: '/offer.jpg', rating: 4.2, stock_status: 'in_stock', brand: 'SolarTech' },
-  // ... add all other fallback products
+  { id: 3, name: 'Lithium LiFePO4 Battery 12 / 300Ah', slug: 'lithium-lifepo4-battery-12-300ah', price: 43999, image: '/offer.jpg', rating: 4.7, stock_status: 'in_stock', brand: 'Uthium' },
+  { id: 4, name: 'Solar Machine Sensor Light (24v)', slug: 'solar-machine-sensor-light-24v', price: 11999, image: '/offer.jpg', rating: 4.3, stock_status: 'in_stock', brand: 'SolarTech' },
+  { id: 5, name: 'MPPT Charge Controller 60A', slug: 'mppt-charge-controller-60a', price: 11399, image: '/offer.jpg', rating: 4.6, stock_status: 'in_stock', brand: 'SolarMax' },
+  { id: 6, name: 'Lithium LiFePO4 Battery 12 / 100Ah', slug: 'lithium-lifepo4-battery-12-100ah', price: 43999, image: '/offer.jpg', rating: 4.5, stock_status: 'in_stock', brand: 'Uthium' },
+  { id: 7, name: 'Solar Motion Sensor Light (24V) Dual', slug: 'solar-motion-sensor-light-24v-dual', price: 11999, image: '/offer.jpg', rating: 4.4, stock_status: 'in_stock', brand: 'SolarTech' },
+  { id: 8, name: 'MPPT Charge Controller 60A Pro', slug: 'mppt-charge-controller-60a-pro', price: 11399, image: '/offer.jpg', rating: 4.8, stock_status: 'in_stock', brand: 'SolarMax' },
 ];
 
 const brandOptions = [
@@ -44,70 +27,39 @@ const brandOptions = [
 ];
 
 export default function ShopPage() {
-  const router = useRouter();         // ✅ now defined
-  const pathname = usePathname();     // ✅ now defined
-  const [adding, setAdding] = useState<Record<number, boolean>>({}); // ✅ for add-to-cart loading
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: products = [], isLoading, error, refetch } = useCustomerProducts();
+  const { data: wishlist = [] } = useWishlist();
+  const addToWishlist = useAddToWishlist();
+  const removeFromWishlist = useRemoveFromWishlist();
 
-  // ---------- Filter & Sort State ----------
+  const [adding, setAdding] = useState<Record<number, boolean>>({});
+  const [displayProducts, setDisplayProducts] = useState<CustomerProduct[]>(fallbackProducts);
   const [priceMax, setPriceMax] = useState(1000000);
   const [brand, setBrand] = useState('All Brands');
   const [applyFilter, setApplyFilter] = useState(false);
   const [sortBy, setSortBy] = useState('default');
 
-  // ---------- Fetch Products ----------
+  // 🔥 FIXED: Only update when products actually change
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await customerApi.products.list();
-        let fetchedProducts = data.data || data.products || [];
+    if (products && products.length > 0) {
+      setDisplayProducts(products);
+    }
+  }, [products]); // ✅ Only depend on products, not displayProducts
 
-        // Normalize product data
-        fetchedProducts = fetchedProducts.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug || createSlug(p.name),
-          price: p.sale_price || p.price,
-          image: p.image || '/offer.jpg',
-          rating: p.rating || 4.5,
-          stock_status: p.stock_status || 'in_stock',
-          brand: p.brand || 'Generic',
-          category: p.category?.name,
-        }));
-
-        setProducts(fetchedProducts);
-      } catch (err: any) {
-        console.error('Failed to fetch products:', err);
-        setError(err?.message || 'Failed to load products');
-        setProducts(fallbackProducts);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
-
-  // ---------- Apply Filters & Sorting ----------
+  // 🔥 FIXED: Filter effect with proper dependencies
   useEffect(() => {
-    let result = [...products];
-
+    let result = [...displayProducts];
+    
     if (applyFilter) {
-      // Price filter
       result = result.filter((p) => p.price <= priceMax);
-      // Brand filter
       if (brand !== 'All Brands') {
         result = result.filter((p) => p.brand === brand);
       }
     }
 
-    // Sorting
     switch (sortBy) {
       case 'price-low-high':
         result.sort((a, b) => a.price - b.price);
@@ -121,15 +73,24 @@ export default function ShopPage() {
       default: break;
     }
 
-    setFilteredProducts(result);
-  }, [products, applyFilter, priceMax, brand, sortBy]);
+    setDisplayProducts(result);
+  }, [priceMax, brand, sortBy, applyFilter]); // ✅ Only run when these change
 
-  // ---------- Reset filter flag when filters change ----------
+  // Reset filter flag when filters change
   useEffect(() => {
     setApplyFilter(false);
   }, [priceMax, brand]);
 
-  // ✅ Add to Cart Handler
+  // Wishlist toggle
+  const handleWishlistToggle = async (productId: number) => {
+    const item = wishlist.find((item) => item.product_id === productId);
+    if (item) {
+      await removeFromWishlist.mutateAsync(item.id);
+    } else {
+      await addToWishlist.mutateAsync(productId);
+    }
+  };
+
   async function handleAddToCart(id: number, price: number) {
     try {
       setAdding((prev) => ({ ...prev, [id]: true }));
@@ -146,8 +107,7 @@ export default function ShopPage() {
     }
   }
 
-  // ---------- Loading & Error States ----------
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-[#4EA674]" />
@@ -163,9 +123,9 @@ export default function ShopPage() {
             <X className="w-8 h-8 text-red-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <p className="text-gray-600 mb-6">{error instanceof Error ? error.message : 'Failed to load products'}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => refetch()}
             className="px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
           >
             Try Again
@@ -231,7 +191,7 @@ export default function ShopPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">All Products</h1>
               <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
-                <span>Showing {filteredProducts.length} / {products.length}</span>
+                <span>Showing {displayProducts.length} / {products?.length || 0}</span>
                 <div className="relative">
                   <select
                     value={sortBy}
@@ -248,70 +208,75 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {filteredProducts.length === 0 ? (
+            {displayProducts.length === 0 ? (
               <div className="text-center py-20 text-gray-600 bg-white rounded-xl">
                 No products match your filters. Try adjusting price or brand.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-                {filteredProducts.map((p) => (
-                  <div key={p.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-                    <div className="relative pt-[75%]">
-                      <Image src={p.image || '/offer.jpg'} alt={p.name} fill className="object-cover" />
-                      <button className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition">
-                        <Heart className="w-5 h-5 text-gray-600" />
-                      </button>
-                    </div>
-
-                    <div className="p-4">
-                      <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1">{p.name}</h3>
-                      <div className="flex items-center gap-1 mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < Math.floor(p.rating || 0)
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <p
-                        className={`text-xs font-medium mb-2 ${
-                          p.stock_status === 'in_stock'
-                            ? 'text-green-600'
-                            : p.stock_status === 'low_stock'
-                            ? 'text-orange-600'
-                            : 'text-red-600'
-                        }`}
-                      >
-                        {p.stock_status === 'in_stock'
-                          ? 'In stock'
-                          : p.stock_status === 'low_stock'
-                          ? 'Low stock'
-                          : 'Out of stock'}
-                      </p>
-                      <p className="text-xl font-bold text-[#4EA674] mb-4">₦{p.price.toLocaleString()}</p>
-
-                      <div className="flex gap-3">
-                        <Link
-                          href={`/products/${p.slug || createSlug(p.name)}`}
-                          className="flex-1 text-center py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-medium hover:bg-[#4EA674]/10 transition"
-                        >
-                          View Details
-                        </Link>
+                {displayProducts.map((p) => {
+                  const isInWishlist = wishlist.some((item) => item.product_id === p.id);
+                  return (
+                    <div key={p.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
+                      <div className="relative pt-[75%]">
+                        <Image src={p.image || '/offer.jpg'} alt={p.name} fill className="object-cover" />
                         <button
-                          onClick={() => handleAddToCart(p.id, p.price)}
-                          disabled={adding[p.id]}
-                          className="flex-1 bg-[#4EA674] text-white py-2 rounded-full text-sm font-medium hover:bg-[#3e8c5f] transition disabled:opacity-60"
+                          onClick={() => handleWishlistToggle(p.id)}
+                          disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+                          className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition"
                         >
-                          {adding[p.id] ? 'Adding...' : 'Add to Cart'}
+                          <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
                         </button>
                       </div>
+                      <div className="p-4">
+                        <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1">{p.name}</h3>
+                        <div className="flex items-center gap-1 mb-2">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${
+                                i < Math.floor(p.rating || 0)
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <p
+                          className={`text-xs font-medium mb-2 ${
+                            p.stock_status === 'in_stock'
+                              ? 'text-green-600'
+                              : p.stock_status === 'low_stock'
+                              ? 'text-orange-600'
+                              : 'text-red-600'
+                          }`}
+                        >
+                          {p.stock_status === 'in_stock'
+                            ? 'In stock'
+                            : p.stock_status === 'low_stock'
+                            ? 'Low stock'
+                            : 'Out of stock'}
+                        </p>
+                        <p className="text-xl font-bold text-[#4EA674] mb-4">₦{p.price.toLocaleString()}</p>
+                        <div className="flex gap-3">
+                          <Link
+                            href={`/products/${p.slug || createSlug(p.name)}`}
+                            className="flex-1 text-center py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-medium hover:bg-[#4EA674]/10 transition"
+                          >
+                            View Details
+                          </Link>
+                          <button
+                            onClick={() => handleAddToCart(p.id, p.price)}
+                            disabled={adding[p.id]}
+                            className="flex-1 bg-[#4EA674] text-white py-2 rounded-full text-sm font-medium hover:bg-[#3e8c5f] transition disabled:opacity-60"
+                          >
+                            {adding[p.id] ? 'Adding...' : 'Add to Cart'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </main>

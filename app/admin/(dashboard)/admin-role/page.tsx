@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import {
   Search,
   Bell,
@@ -15,305 +15,290 @@ import {
   Copy,
   Pencil,
   Sparkles,
-} from "lucide-react";
-import { useTheme } from "next-themes";
-import { api } from "@/lib/apiClient";
-
-type Msg = { type: "success" | "error"; text: string } | null;
-
-type ProfileData = {
-  id: number;
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-  avatar: string | null;
-  avatar_url?: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  dob: string | null;
-  location: string | null;
-  bio: string | null;
-  role?: string | null;
-};
-
-type ProfileResponse = {
-  message?: string;
-  success?: boolean;
-  status?: boolean;
-  data: ProfileData;
-};
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { 
+  useProfile, 
+  useUpdateProfile, 
+  useUploadAvatar, 
+  useUpdatePassword,
+  type ProfileData,
+} from '@/hooks/useProfile';
 
 export default function AdminRolePage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  // ---------- React Query ----------
+  const { 
+    data: profile, 
+    isLoading: profileLoading, 
+    error: profileError,
+    refetch: refetchProfile 
+  } = useProfile();
+
+  const updateProfile = useUpdateProfile();
+  const uploadAvatar = useUploadAvatar();
+  const updatePassword = useUpdatePassword();
+
+  // ---------- Local UI states ----------
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [pwdMsg, setPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const [profileMsg, setProfileMsg] = useState<Msg>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
+  // ---------- Avatar ----------
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [displayUrl, setDisplayUrl] = useState<string>('/man.png');
 
-  const fileRef = useRef<HTMLInputElement | null>(null);
-
-  // ✅ Avatar state (uses proxy for protected images)
-  const [avatarUrl, setAvatarUrl] = useState<string>("/man.png");
-
-  // ✅ Profile form state
+  // ---------- Form state ----------
   const [formData, setFormData] = useState({
-    firstName: "Wade",
-    lastName: "Warren",
-    email: "wade.warren@example.com",
-    phone: "(406) 555-0120",
-    dob: "1999-01-12",
-    location: "2972 Westheimer Rd. Santa Ana, Illinois 85486",
-    password: "********",
-    confirmPassword: "",
-    bio: "",
-    creditCard: "843-4359-4444",
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    dob: '',
+    location: '',
+    bio: '',
+    creditCard: '843-4359-4444', // static for now
   });
 
-  // ✅ Password change form state
+  // ---------- Password form ----------
   const [pwd, setPwd] = useState({
-    current_password: "",
-    password: "",
-    password_confirmation: "",
+    current_password: '',
+    password: '',
+    password_confirmation: '',
   });
-  const [pwdLoading, setPwdLoading] = useState(false);
-  const [pwdMsg, setPwdMsg] = useState<Msg>(null);
 
   // ---------- Helper: split full name ----------
-  function splitName(fullName: string) {
-    const parts = fullName.trim().split(" ").filter(Boolean);
-    return { first: parts[0] || "", last: parts.slice(1).join(" ") || "" };
-  }
+  const splitName = (fullName: string) => {
+    const parts = fullName.trim().split(' ').filter(Boolean);
+    return { first: parts[0] || '', last: parts.slice(1).join(' ') || '' };
+  };
 
-  // ---------- Helper: resolve avatar URL (same logic) ----------
-  function resolveAvatar(pathOrUrl: string | null | undefined) {
-    if (!pathOrUrl || String(pathOrUrl).trim() === "") return null;
+  // ---------- Helper: resolve absolute avatar URL ----------
+  const resolveAvatar = (pathOrUrl: string | null | undefined): string | null => {
+    if (!pathOrUrl || String(pathOrUrl).trim() === '') return null;
     const raw = String(pathOrUrl).trim();
-    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-    let clean = raw.startsWith("/") ? raw.slice(1) : raw;
-    if (clean.startsWith("avatars/")) clean = `storage/${clean}`;
-    return `${process.env.NEXT_PUBLIC_API_URL || "https://admin.bezalelsolar.com"}/${clean}`;
-  }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    let clean = raw.startsWith('/') ? raw.slice(1) : raw;
+    if (clean.startsWith('avatars/')) clean = `storage/${clean}`;
+    const base = process.env.NEXT_PUBLIC_API_URL || 'https://admin.bezalelsolar.com';
+    return `${base}/${clean}`;
+  };
 
-  // ---------- Helper: proxy image URL (unchanged) ----------
-  function proxiedImageUrl(realUrl: string) {
-    const token = localStorage.getItem("adminToken") || "";
-    return `/api/proxy-image?url=${encodeURIComponent(realUrl)}&token=${encodeURIComponent(
-      token
-    )}&t=${Date.now()}`;
-  }
+  // ---------- Fetch protected image with Bearer token ----------
+  const fetchProtectedImage = async (imageUrl: string): Promise<string | null> => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return null;
 
-  // ---------- Helper: copy to clipboard ----------
-  async function copyToClipboard(text: string) {
     try {
-      await navigator.clipboard.writeText(text);
-      setProfileMsg({ type: "success", text: "Copied!" });
-      setTimeout(() => setProfileMsg(null), 1200);
-    } catch {
-      setProfileMsg({ type: "error", text: "Copy failed." });
-      setTimeout(() => setProfileMsg(null), 1200);
+      const res = await fetch(imageUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Avatar fetch error:', error);
+      return null;
     }
-  }
+  };
 
-  // ---------- Load avatar from localStorage (proxy) ----------
-  function loadAvatarFromStorage() {
-    const savedSrc = localStorage.getItem("adminAvatarSrc");
-    if (!savedSrc) return;
-    setAvatarUrl(proxiedImageUrl(savedSrc));
-  }
-
-  // ---------- Fetch profile via apiClient ----------
-  async function fetchProfile() {
-    setProfileMsg(null);
-    setProfileLoading(true);
-
-    try {
-      const json = (await api.profile.get()) as ProfileResponse;
-
-      const u = json.data;
-
-      // Update form
-      const fullName = u?.name || "";
-      const { first, last } = splitName(fullName);
-
-      setFormData((prev) => ({
-        ...prev,
-        firstName: u?.first_name ?? first ?? prev.firstName,
-        lastName: u?.last_name ?? last ?? prev.lastName,
-        email: u?.email ?? prev.email,
-        phone: u?.phone ?? prev.phone,
-        dob: u?.dob ?? prev.dob,
-        location: u?.location ?? prev.location,
-        bio: u?.bio ?? prev.bio ?? "",
-        password: "********",
-      }));
-
-      // Avatar from API
-      const fromApi = u?.avatar_url || u?.avatar || null;
-      const realUrl = resolveAvatar(fromApi);
-
-      if (realUrl) {
-        localStorage.setItem("adminAvatarSrc", realUrl);
-        setAvatarUrl(proxiedImageUrl(realUrl));
-      } else {
-        setAvatarUrl("/man.png");
-        localStorage.removeItem("adminAvatarSrc");
+  // ---------- Load avatar when profile changes ----------
+  useEffect(() => {
+    const loadAvatar = async () => {
+      if (!profile) {
+        setDisplayUrl('/man.png');
+        return;
       }
 
-      localStorage.setItem("adminUser", JSON.stringify(u));
-    } catch (e: any) {
-      setProfileMsg({
-        type: "error",
-        text: e?.message || "Network error loading profile.",
+      const fromApi = profile.avatar_url || profile.avatar || null;
+      const real = resolveAvatar(fromApi);
+      if (!real) {
+        setDisplayUrl('/man.png');
+        return;
+      }
+
+      try {
+        const blobUrl = await fetchProtectedImage(real);
+        // Clean up old blob URL
+        if (displayUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(displayUrl);
+        }
+        setDisplayUrl(blobUrl || '/man.png');
+        localStorage.setItem('adminAvatarSrc', real);
+      } catch (error) {
+        console.error('Avatar load failed:', error);
+        setDisplayUrl('/man.png');
+      }
+    };
+
+    loadAvatar();
+  }, [profile]);
+
+  // ---------- Sync profile data to form ----------
+  useEffect(() => {
+    if (profile) {
+      const fullName = profile.name || '';
+      const { first, last } = splitName(fullName);
+      setFormData({
+        firstName: profile.first_name ?? first,
+        lastName: profile.last_name ?? last,
+        email: profile.email ?? '',
+        phone: profile.phone ?? '',
+        dob: profile.dob ?? '',
+        location: profile.location ?? '',
+        bio: profile.bio ?? '',
+        creditCard: formData.creditCard, // keep existing
       });
-    } finally {
-      setProfileLoading(false);
     }
-  }
+  }, [profile]);
 
-  // ---------- Save profile via apiClient ----------
-  async function handleSaveProfile() {
-    setProfileMsg(null);
-    setProfileSaving(true);
-
+  // ---------- Copy to clipboard ----------
+  const copyToClipboard = async (text: string) => {
     try {
-      const json = await api.profile.update({
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        phone: formData.phone,
+      await navigator.clipboard.writeText(text);
+      setProfileMsg({ type: 'success', text: 'Copied!' });
+      setTimeout(() => setProfileMsg(null), 1200);
+    } catch {
+      setProfileMsg({ type: 'error', text: 'Copy failed.' });
+      setTimeout(() => setProfileMsg(null), 1200);
+    }
+  };
+
+  // ---------- Save profile ----------
+  const handleSaveProfile = async () => {
+    setProfileMsg(null);
+    try {
+      await updateProfile.mutateAsync({
+        first_name: formData.firstName || null,
+        last_name: formData.lastName || null,
+        phone: formData.phone || null,
         dob: formData.dob || null,
         location: formData.location || null,
         bio: formData.bio || null,
       });
-
-      setProfileMsg({
-        type: "success",
-        text: json?.message || "Profile updated successfully.",
-      });
-
-      setTimeout(() => fetchProfile(), 600);
+      setProfileMsg({ type: 'success', text: 'Profile updated successfully.' });
     } catch (e: any) {
       setProfileMsg({
-        type: "error",
-        text: e?.message || "Network error updating profile.",
+        type: 'error',
+        text: e?.message || 'Failed to update profile.',
       });
-    } finally {
-      setProfileSaving(false);
     }
-  }
+  };
 
-  // ---------- Upload avatar via apiClient ----------
-  async function uploadAvatar(file: File) {
+  // ---------- Upload avatar ----------
+  const handleUploadAvatar = async (file: File) => {
     setProfileMsg(null);
-    setAvatarUploading(true);
-
+    
     // Preview immediately
     const preview = URL.createObjectURL(file);
-    setAvatarUrl(preview);
+    setDisplayUrl(preview);
 
     try {
-      const json = await api.profile.uploadAvatar(file);
-
-      const possibleAvatar =
-        json?.avatar_url ||
-        json?.user?.avatar_url ||
-        json?.user?.avatar ||
-        json?.data?.avatar_url ||
-        json?.data?.avatar ||
-        json?.avatar ||
+      const response = await uploadAvatar.mutateAsync(file);
+      
+      // Extract new avatar URL from response
+      const newAvatarUrl = 
+        response?.avatar_url ||
+        response?.data?.avatar_url ||
+        response?.data?.avatar ||
+        response?.user?.avatar_url ||
+        response?.user?.avatar ||
         null;
 
-      if (possibleAvatar) {
-        const realUrl = resolveAvatar(String(possibleAvatar));
-        if (realUrl) {
-          localStorage.setItem("adminAvatarSrc", realUrl);
-          setAvatarUrl(proxiedImageUrl(realUrl));
-        } else {
-          setAvatarUrl("/man.png");
+      if (newAvatarUrl) {
+        const real = resolveAvatar(String(newAvatarUrl));
+        if (real) {
+          localStorage.setItem('adminAvatarSrc', real);
+          const blobUrl = await fetchProtectedImage(real);
+          setDisplayUrl(blobUrl || '/man.png');
         }
       } else {
-        await fetchProfile();
+        // No URL in response, refetch profile
+        await refetchProfile();
       }
 
-      setProfileMsg({
-        type: "success",
-        text: json?.message || "Avatar uploaded successfully.",
-      });
+      setProfileMsg({ type: 'success', text: 'Avatar uploaded successfully.' });
     } catch (e: any) {
       setProfileMsg({
-        type: "error",
-        text: e?.message || "Network error uploading avatar.",
+        type: 'error',
+        text: e?.message || 'Failed to upload avatar.',
       });
-      loadAvatarFromStorage();
-    } finally {
-      setAvatarUploading(false);
+      // Revert to previous avatar on error
+      if (profile) {
+        const fromApi = profile.avatar_url || profile.avatar || null;
+        const real = resolveAvatar(fromApi);
+        if (real) {
+          const blobUrl = await fetchProtectedImage(real);
+          setDisplayUrl(blobUrl || '/man.png');
+        } else {
+          setDisplayUrl('/man.png');
+        }
+      } else {
+        setDisplayUrl('/man.png');
+      }
     }
-  }
+  };
 
-  // ---------- Delete avatar (frontend only – same as before) ----------
-  function deleteAvatarFrontendOnly() {
-    setAvatarUrl("/man.png");
-    localStorage.removeItem("adminAvatarSrc");
-    setProfileMsg({ type: "success", text: "Avatar removed (frontend only)." });
+  // ---------- Delete avatar (frontend only) ----------
+  const deleteAvatarFrontendOnly = () => {
+    localStorage.removeItem('adminAvatarSrc');
+    setDisplayUrl('/man.png');
+    setProfileMsg({ type: 'success', text: 'Avatar removed (frontend only).' });
     setTimeout(() => setProfileMsg(null), 1200);
-  }
+  };
 
-  // ---------- Update password via apiClient ----------
-  async function handleUpdatePassword() {
+  // ---------- Update password ----------
+  const handleUpdatePassword = async () => {
     setPwdMsg(null);
-    setPwdLoading(true);
+
+    if (!pwd.current_password || !pwd.password || !pwd.password_confirmation) {
+      setPwdMsg({ type: 'error', text: 'Please fill all password fields.' });
+      return;
+    }
+    if (pwd.password !== pwd.password_confirmation) {
+      setPwdMsg({ type: 'error', text: 'New password and confirmation do not match.' });
+      return;
+    }
 
     try {
-      if (!pwd.current_password || !pwd.password || !pwd.password_confirmation) {
-        setPwdMsg({ type: "error", text: "Please fill all password fields." });
-        return;
-      }
-      if (pwd.password !== pwd.password_confirmation) {
-        setPwdMsg({ type: "error", text: "New password and confirmation do not match." });
-        return;
-      }
-
-      const json = await api.profile.updatePassword(pwd);
-
-      setPwdMsg({ type: "success", text: json?.message || "Password updated successfully." });
-      setPwd({ current_password: "", password: "", password_confirmation: "" });
+      const response = await updatePassword.mutateAsync(pwd);
+      setPwdMsg({ type: 'success', text: response?.message || 'Password updated successfully.' });
+      setPwd({ current_password: '', password: '', password_confirmation: '' });
     } catch (e: any) {
-      setPwdMsg({ type: "error", text: e?.message || "Network error. Please try again." });
-    } finally {
-      setPwdLoading(false);
+      setPwdMsg({
+        type: 'error',
+        text: e?.message || 'Failed to update password.',
+      });
     }
-  }
+  };
 
-  // ---------- Initial load ----------
+  // ---------- Mount ----------
   useEffect(() => {
     setMounted(true);
-    loadAvatarFromStorage();
-    fetchProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fullName = `${formData.firstName} ${formData.lastName}`.trim();
 
-  const AvatarImg = ({ className }: { className: string }) => (
-    <img
-      src={avatarUrl}
-      alt="Admin"
-      className={className}
-      onError={() => setAvatarUrl("/man.png")}
-    />
-  );
+  // ---------- Image error handler ----------
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
 
-  // ---------- Render (EXACT original JSX) ----------
+  if (!mounted) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm gap-3">
+      {/* Header (keep your existing header) */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
           Admin role
         </h1>
@@ -346,26 +331,31 @@ export default function AdminRolePage() {
             <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-700" />
           ) : (
             <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               aria-label="Toggle dark mode"
               type="button"
             >
               <Sun
                 className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
-                  theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+                  theme === 'dark' ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'
                 }`}
               />
               <Moon
                 className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
-                  theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                  theme === 'dark' ? 'scale-100 rotate-0 opacity-100' : 'scale-0 -rotate-90 opacity-0'
                 }`}
               />
             </button>
           )}
 
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600 flex-shrink-0">
-            <AvatarImg className="object-cover w-full h-full" />
+            <img
+              src={displayUrl}
+              alt="Admin"
+              className="object-cover w-full h-full"
+              onError={handleImageError}
+            />
           </div>
         </div>
       </header>
@@ -385,34 +375,42 @@ export default function AdminRolePage() {
       )}
 
       <main className="p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950 overflow-x-hidden">
-        {(profileLoading || profileSaving || avatarUploading) && (
+        {(profileLoading || updateProfile.isPending || uploadAvatar.isPending) && (
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-            {profileLoading && "Loading profile..."}
-            {profileSaving && "Saving profile..."}
-            {avatarUploading && "Uploading avatar..."}
+            {profileLoading && 'Loading profile...'}
+            {updateProfile.isPending && 'Saving profile...'}
+            {uploadAvatar.isPending && 'Uploading avatar...'}
           </p>
+        )}
+
+        {profileError && (
+          <div className="mb-6 text-sm p-3 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200">
+            Failed to load profile. Please refresh.
+          </div>
         )}
 
         {profileMsg && (
           <div
             className={`mb-6 text-sm p-3 rounded-lg ${
-              profileMsg.type === "success"
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200"
-                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200"
+              profileMsg.type === 'success'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200'
             }`}
           >
             {profileMsg.text}
           </div>
         )}
 
+        {/* File input */}
         <input
+          key={uploadAvatar.isPending ? 'uploading' : 'ready'}
           ref={fileRef}
           type="file"
           accept="image/*"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) uploadAvatar(f);
+            if (f) handleUploadAvatar(f);
           }}
         />
 
@@ -430,6 +428,7 @@ export default function AdminRolePage() {
                     onClick={() => fileRef.current?.click()}
                     className="hover:text-gray-700 dark:hover:text-gray-100 transition"
                     title="Edit avatar"
+                    disabled={uploadAvatar.isPending}
                   >
                     <Edit2 className="w-5 h-5" />
                   </button>
@@ -447,15 +446,15 @@ export default function AdminRolePage() {
               <div className="flex flex-col items-center text-center">
                 <div className="w-28 h-28 rounded-full overflow-hidden mb-4 ring-4 ring-gray-100 dark:ring-gray-700">
                   <img
-                    src={avatarUrl}
+                    src={displayUrl}
                     alt="Profile"
                     className="object-cover w-full h-full"
-                    onError={() => setAvatarUrl("/man.png")}
+                    onError={handleImageError}
                   />
                 </div>
 
                 <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {fullName || "Admin"}
+                  {fullName || 'Admin'}
                 </h4>
 
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 min-w-0">
@@ -492,6 +491,7 @@ export default function AdminRolePage() {
               </div>
             </div>
 
+            {/* Change Password */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Change Password</h3>
@@ -573,9 +573,9 @@ export default function AdminRolePage() {
                 {pwdMsg && (
                   <div
                     className={`text-sm p-3 rounded-lg ${
-                      pwdMsg.type === "success"
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200"
-                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200"
+                      pwdMsg.type === 'success'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200'
                     }`}
                   >
                     {pwdMsg.text}
@@ -585,10 +585,10 @@ export default function AdminRolePage() {
                 <button
                   type="button"
                   onClick={handleUpdatePassword}
-                  disabled={pwdLoading}
+                  disabled={updatePassword.isPending}
                   className="w-full mt-2 px-8 py-3.5 bg-[#4EA674] text-white rounded-xl text-sm font-medium hover:bg-[#3D8B59] transition-colors disabled:opacity-50"
                 >
-                  {pwdLoading ? "Saving..." : "Save Change"}
+                  {updatePassword.isPending ? 'Saving...' : 'Save Change'}
                 </button>
               </div>
             </div>
@@ -601,7 +601,7 @@ export default function AdminRolePage() {
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Profile Update</h3>
                 <button
                   type="button"
-                  onClick={fetchProfile}
+                  onClick={() => refetchProfile()}
                   className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2 text-gray-800 dark:text-gray-100"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -613,10 +613,10 @@ export default function AdminRolePage() {
                 <div className="relative">
                   <div className="w-14 h-14 rounded-full overflow-hidden ring-4 ring-gray-100 dark:ring-gray-700">
                     <img
-                      src={avatarUrl}
+                      src={displayUrl}
                       alt="Profile"
                       className="object-cover w-full h-full"
-                      onError={() => setAvatarUrl("/man.png")}
+                      onError={handleImageError}
                     />
                   </div>
                 </div>
@@ -625,10 +625,10 @@ export default function AdminRolePage() {
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    disabled={avatarUploading}
+                    disabled={uploadAvatar.isPending}
                     className="px-6 py-2.5 bg-[#4EA674] text-white rounded-xl text-sm font-medium hover:bg-[#3D8B59] transition disabled:opacity-50"
                   >
-                    {avatarUploading ? "Uploading..." : "Upload New"}
+                    {uploadAvatar.isPending ? 'Uploading...' : 'Upload New'}
                   </button>
                   <button
                     type="button"
@@ -672,7 +672,7 @@ export default function AdminRolePage() {
                   <div className="relative">
                     <input
                       type="password"
-                      value={formData.password}
+                      value="********"
                       readOnly
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none"
                     />
@@ -789,10 +789,10 @@ export default function AdminRolePage() {
                 <button
                   type="button"
                   onClick={handleSaveProfile}
-                  disabled={profileSaving}
+                  disabled={updateProfile.isPending}
                   className="px-8 py-3.5 bg-[#4EA674] text-white rounded-xl text-sm font-medium hover:bg-[#3D8B59] transition-colors disabled:opacity-50"
                 >
-                  {profileSaving ? "Saving..." : "Save Change"}
+                  {updateProfile.isPending ? 'Saving...' : 'Save Change'}
                 </button>
               </div>
             </div>

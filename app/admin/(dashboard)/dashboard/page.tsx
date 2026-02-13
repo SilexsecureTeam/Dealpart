@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
 import {
   MoreVertical,
   Search,
@@ -20,9 +21,22 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { useTheme } from 'next-themes';
 
-// ---------- TYPES ----------
+// ---------- React Query Hooks ----------
+import {
+  useDashboardSummary,
+  useDashboardWeeklyStats,
+  useDashboardWeeklySales,
+  useDashboardLiveUsers,
+  useDashboardCountrySales,
+  useAdminTransactions,
+  useBestSellingProducts,
+  useTopProducts,
+} from '@/hooks/useDashboard';
+import { useCategories } from '@/hooks/useCategories';
+import { Product, Transaction } from '@/types';
+
+// ---------- Types ----------
 type AdminUser = {
   id: number;
   name: string | null;
@@ -33,194 +47,14 @@ type AdminUser = {
   expires_at: string | null;
 };
 
-type SummaryStats = {
-  totalSales: number;
-  totalOrders: number;
-  pendingOrders: number;
-  canceledOrders: number;
-  previousTotalSales: number;
-  previousTotalOrders: number;
-  salesGrowth: number;
-  ordersGrowth: number;
-  pendingGrowth: number;
-  canceledGrowth: number;
-};
-
-type WeeklyStat = {
-  customers: number;
-  totalProducts: number;
-  stockProducts: number;
-  outOfStock: number;
-  revenue: number;
-};
-
-type Transaction = {
-  id: string;
-  customer: string;
-  date: string;
-  status: 'Paid' | 'Pending' | 'Canceled';
-  amount: number;
-};
-
-type Product = {
-  id: number;
-  name: string;
-  image: string;
-  orders?: number;
-  status?: 'Stock' | 'Stock out';
-  price: number;
-  itemCode?: string;
-};
-
-type Category = {
-  id: number;
-  name: string;
-  image: string;
-};
-
-type CountrySales = {
-  country: string;
-  flag: string;
-  sales: number;
-  change: number;
-  width: number;
-};
-
-// ---------- MOCK API FUNCTIONS (temporary) ----------
-const mockFetchSummary = (): Promise<SummaryStats> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        totalSales: 350000,
-        totalOrders: 10700,
-        pendingOrders: 509,
-        canceledOrders: 94,
-        previousTotalSales: 235000,
-        previousTotalOrders: 7600,
-        salesGrowth: 10.4,
-        ordersGrowth: 14.4,
-        pendingGrowth: 8.2,
-        canceledGrowth: -14.4,
-      });
-    }, 800);
-  });
-};
-
-const mockFetchWeeklyStats = (): Promise<WeeklyStat> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        customers: 52000,
-        totalProducts: 3500,
-        stockProducts: 2500,
-        outOfStock: 500,
-        revenue: 250000,
-      });
-    }, 600);
-  });
-};
-
-const mockFetchWeeklySales = (): Promise<{ day: string; sales: number }[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { day: 'Sun', sales: 12000 },
-        { day: 'Mon', sales: 19000 },
-        { day: 'Tue', sales: 25000 },
-        { day: 'Wed', sales: 22000 },
-        { day: 'Thu', sales: 14000 },
-        { day: 'Fri', sales: 18000 },
-        { day: 'Sat', sales: 21000 },
-      ]);
-    }, 700);
-  });
-};
-
-const mockFetchTransactions = (): Promise<Transaction[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: '6545', customer: 'John Doe', date: '01 Oct | 11:29 am', status: 'Paid', amount: 64 },
-        { id: '5412', customer: 'Jane Smith', date: '01 Oct | 11:29 am', status: 'Pending', amount: 557 },
-        { id: '6622', customer: 'Bob Johnson', date: '01 Oct | 11:29 am', status: 'Paid', amount: 156 },
-        { id: '6462', customer: 'Alice Brown', date: '01 Oct | 11:29 am', status: 'Paid', amount: 265 },
-        { id: '7011', customer: 'Charlie White', date: '01 Oct | 11:29 am', status: 'Paid', amount: 265 },
-      ]);
-    }, 900);
-  });
-};
-
-const mockFetchBestSelling = (): Promise<Product[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: 1, name: 'Monocrystalle Panel', image: '/solarpanel.png', orders: 104, status: 'Stock', price: 999.0 },
-        { id: 2, name: 'Monocrystalle Panel', image: '/solarpanel.png', orders: 56, status: 'Stock out', price: 999.0 },
-        { id: 3, name: 'Monocrystalle Panel', image: '/solarpanel.png', orders: 266, status: 'Stock', price: 999.0 },
-        { id: 4, name: 'Monocrystalle Panel', image: '/solarpanel.png', orders: 506, status: 'Stock', price: 999.0 },
-      ]);
-    }, 700);
-  });
-};
-
-const mockFetchTopProducts = (): Promise<Product[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: 1, name: 'Monocrystalle Panel', image: '/solarpanel.png', itemCode: '#FXZ-4567', price: 999.0 },
-        { id: 2, name: 'Monocrystalle Panel', image: '/solarpanel.png', itemCode: '#FXZ-4567', price: 724.0 },
-        { id: 3, name: 'Monocrystalle Panel', image: '/solarpanel.png', itemCode: '#FXZ-4567', price: 345.0 },
-        { id: 4, name: 'Monocrystalle Panel', image: '/solarpanel.png', itemCode: '#FXZ-4567', price: 800.0 },
-      ]);
-    }, 650);
-  });
-};
-
-const mockFetchCategories = (): Promise<Category[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: 1, name: 'Pv Solar panels', image: '/solarpanel.png' },
-        { id: 2, name: 'Inverters', image: '/solarpanel.png' },
-        { id: 3, name: 'Batteries', image: '/solarpanel.png' },
-        { id: 4, name: 'Charge Controllers', image: '/solarpanel.png' },
-      ]);
-    }, 500);
-  });
-};
-
-const mockFetchLiveUsers = (): Promise<{ total: number; perMinute: number; activity: number[] }> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        total: 21500,
-        perMinute: 12.4,
-        activity: [30, 35, 32, 40, 25, 28, 30, 22, 35, 38, 45, 42, 50, 48, 45, 40, 42, 48, 52, 50],
-      });
-    }, 550);
-  });
-};
-
-const mockFetchCountrySales = (): Promise<CountrySales[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { country: 'US', flag: 'us', sales: 30000, change: 25.8, width: 100 },
-        { country: 'Brazil', flag: 'br', sales: 30000, change: -15.8, width: 85 },
-        { country: 'Australia', flag: 'au', sales: 25000, change: 35.8, width: 70 },
-      ]);
-    }, 600);
-  });
-};
-
-// ---------- HELPERS ----------
+// ---------- Helpers ----------
 const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
 const formatCompact = (num: number) => {
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toString();
 };
 
-// ---------- LOADING SKELETONS (OUTSIDE component) ----------
+// ---------- Loading Skeletons ----------
 const SkeletonCard = () => (
   <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm animate-pulse">
     <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4" />
@@ -231,54 +65,67 @@ const SkeletonCard = () => (
 
 const SkeletonTableRow = () => (
   <tr className="animate-pulse">
-    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-6" /></td>
-    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
-    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" /></td>
-    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
-    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-6" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
+    <td className="px-6 py-5"><div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-24" /></td>
+    <td className="px-6 py-5"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></td>
   </tr>
 );
 
-// ---------- MAIN COMPONENT ----------
+const SkeletonBestSellingRow = () => (
+  <tr className="animate-pulse">
+    <td className="py-6 flex items-center gap-4">
+      <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+    </td>
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" /></td>
+    <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
+    <td className="py-6 text-right"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto" /></td>
+  </tr>
+);
+
+// ---------- Main Component ----------
 export default function AdminDashboard() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-
-  // ---------- STATE ----------
   const [admin, setAdmin] = useState<AdminUser | null>(null);
+
+  // ---------- Filters ----------
   const [transactionFilter, setTransactionFilter] = useState<string>('All');
   const [bestSellingFilter, setBestSellingFilter] = useState<string>('All');
 
-  const [loadingSummary, setLoadingSummary] = useState(true);
-  const [loadingWeeklyStats, setLoadingWeeklyStats] = useState(true);
-  const [loadingChart, setLoadingChart] = useState(true);
-  const [loadingTransactions, setLoadingTransactions] = useState(true);
-  const [loadingBestSelling, setLoadingBestSelling] = useState(true);
-  const [loadingTopProducts, setLoadingTopProducts] = useState(true);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingLiveUsers, setLoadingLiveUsers] = useState(true);
-  const [loadingCountrySales, setLoadingCountrySales] = useState(true);
+  // ---------- React Query ----------
+  const { data: summary, isLoading: loadingSummary } = useDashboardSummary();
+  const { data: weeklyStats, isLoading: loadingWeeklyStats } = useDashboardWeeklyStats();
+  const { data: weeklySales, isLoading: loadingChart } = useDashboardWeeklySales();
+  const { data: transactions = [], isLoading: loadingTransactions } = useAdminTransactions();
+  const { data: categories = [], isLoading: loadingCategories } = useCategories();
+  const { data: bestSellingData, isLoading: loadingBestSelling } = useBestSellingProducts(4);
+  const { data: topProductsData, isLoading: loadingTopProducts } = useTopProducts(4);
+  const { data: liveUsers, isLoading: loadingLiveUsers } = useDashboardLiveUsers();
+  const { data: countrySales = [], isLoading: loadingCountrySales } = useDashboardCountrySales();
 
-  const [summary, setSummary] = useState<SummaryStats | null>(null);
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyStat | null>(null);
-  const [weeklySales, setWeeklySales] = useState<{ day: string; sales: number }[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [bestSelling, setBestSelling] = useState<Product[]>([]);
-  const [topProducts, setTopProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [liveUsers, setLiveUsers] = useState<{ total: number; perMinute: number; activity: number[] } | null>(null);
-  const [countrySales, setCountrySales] = useState<CountrySales[]>([]);
+  // ---------- Derived Data (with safe fallbacks) ----------
+  const bestSelling = bestSellingData?.data || [];
+  const topProducts = topProductsData?.data || [];
 
-  // ---------- FILTERED DATA ----------
-  const filteredTransactions = transactions.filter((t) =>
+  const filteredTransactions = transactions.filter((t: Transaction) =>
     transactionFilter === 'All' ? true : t.status === transactionFilter
   );
-  const filteredBestSelling = bestSelling.filter((p) =>
-    bestSellingFilter === 'All' ? true : p.status === bestSellingFilter
+
+  const filteredBestSelling = bestSelling.filter((p: Product) =>
+    bestSellingFilter === 'All'
+      ? true
+      : (p.current_stock ?? 0) > 0
+        ? bestSellingFilter === 'Stock'
+        : bestSellingFilter === 'Stock out'
   );
 
-  // ---------- AUTH CHECK & LOAD ADMIN ----------
+  // ---------- Auth Check ----------
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('adminToken');
@@ -296,60 +143,7 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // ---------- FETCH ALL DATA (temporary mock) ----------
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [
-          summaryData,
-          weeklyStatsData,
-          weeklySalesData,
-          transactionsData,
-          bestSellingData,
-          topProductsData,
-          categoriesData,
-          liveUsersData,
-          countrySalesData,
-        ] = await Promise.all([
-          mockFetchSummary(),
-          mockFetchWeeklyStats(),
-          mockFetchWeeklySales(),
-          mockFetchTransactions(),
-          mockFetchBestSelling(),
-          mockFetchTopProducts(),
-          mockFetchCategories(),
-          mockFetchLiveUsers(),
-          mockFetchCountrySales(),
-        ]);
-
-        setSummary(summaryData);
-        setWeeklyStats(weeklyStatsData);
-        setWeeklySales(weeklySalesData);
-        setTransactions(transactionsData);
-        setBestSelling(bestSellingData);
-        setTopProducts(topProductsData);
-        setCategories(categoriesData.slice(0, 3));
-        setLiveUsers(liveUsersData);
-        setCountrySales(countrySalesData);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoadingSummary(false);
-        setLoadingWeeklyStats(false);
-        setLoadingChart(false);
-        setLoadingTransactions(false);
-        setLoadingBestSelling(false);
-        setLoadingTopProducts(false);
-        setLoadingCategories(false);
-        setLoadingLiveUsers(false);
-        setLoadingCountrySales(false);
-      }
-    };
-
-    if (mounted) fetchAll();
-  }, [mounted]);
-
-  // ---------- HANDLERS ----------
+  // ---------- Handlers ----------
   const handleDetailsClick = (path: string) => router.push(`/admin/${path}`);
   const handleAddCategory = () => router.push('/admin/categories');
   const handleAddToCart = (productId: number) => alert(`Add product ${productId} to cart (coming soon)`);
@@ -357,7 +151,7 @@ export default function AdminDashboard() {
   const handleSeeMoreProducts = () => router.push('/admin/product/add');
   const handleViewInsight = () => router.push('/admin/analytics');
 
-  // ---------- RENDER ----------
+  // ---------- Render ----------
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
@@ -613,7 +407,7 @@ export default function AdminDashboard() {
             ) : (
               <div style={{ width: '100%', height: 320, position: 'relative' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklySales} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <AreaChart data={weeklySales || []} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#C1E6BA" stopOpacity={0.8} />
@@ -675,7 +469,7 @@ export default function AdminDashboard() {
                   <p className="text-4xl font-bold mb-6">{formatCompact(liveUsers?.total || 0)}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Users per minute</p>
                   <div className="flex items-end gap-1 h-24">
-                    {liveUsers?.activity.map((h, i) => (
+                    {(liveUsers?.activity || []).map((h, i) => (
                       <div key={i} className="flex-1 bg-[#4EA674] rounded-t-md" style={{ height: `${h}%` }} />
                     ))}
                   </div>
@@ -707,7 +501,7 @@ export default function AdminDashboard() {
                     <h4 className="text-lg font-bold">Sales by Country</h4>
                     <span className="text-sm text-[#7C7C7C]">Sales</span>
                   </div>
-                  {countrySales.map((c) => (
+                  {(countrySales || []).map((c) => (
                     <div key={c.country} className="flex items-center gap-4 mb-5 last:mb-0">
                       <img
                         src={`https://flagcdn.com/w80/${c.flag}.png`}
@@ -786,17 +580,19 @@ export default function AdminDashboard() {
                       [...Array(5)].map((_, i) => <SkeletonTableRow key={i} />)
                     ) : filteredTransactions.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-10 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={5} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                           No transactions found
                         </td>
                       </tr>
                     ) : (
                       filteredTransactions.map((t, i) => (
                         <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                          <td className="py-6 text-gray-600 dark:text-gray-300">{i + 1}.</td>
-                          <td className="py-6 font-semibold">#{t.id}</td>
-                          <td className="py-6 text-gray-600 dark:text-gray-300">{t.date}</td>
-                          <td className="py-6">
+                          <td className="px-6 py-5 text-gray-600 dark:text-gray-300">{i + 1}.</td>
+                          <td className="px-6 py-5 font-semibold">#{t.id}</td>
+                          <td className="px-6 py-5 text-gray-600 dark:text-gray-300">
+                            {typeof t.date === 'string' ? t.date : new Date(t.date).toLocaleDateString('en-GB')}
+                          </td>
+                          <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <span
                                 className={`w-3 h-3 rounded-full ${
@@ -812,7 +608,7 @@ export default function AdminDashboard() {
                               </span>
                             </div>
                           </td>
-                          <td className="py-6 text-right font-bold text-base">
+                          <td className="px-6 py-5 text-right font-bold text-base">
                             {formatCurrency(t.amount)}
                           </td>
                         </tr>
@@ -867,17 +663,7 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {loadingBestSelling ? (
-                      [...Array(4)].map((_, i) => (
-                        <tr key={i} className="animate-pulse">
-                          <td className="py-6 flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32" />
-                          </td>
-                          <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" /></td>
-                          <td className="py-6"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></td>
-                          <td className="py-6 text-right"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto" /></td>
-                        </tr>
-                      ))
+                      [...Array(4)].map((_, i) => <SkeletonBestSellingRow key={i} />)
                     ) : filteredBestSelling.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-10 text-center text-gray-500 dark:text-gray-400">
@@ -885,11 +671,11 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ) : (
-                      filteredBestSelling.map((p, i) => (
-                        <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      filteredBestSelling.map((p) => (
+                        <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                           <td className="py-6 flex items-center gap-4">
                             <Image
-                              src={p.image}
+                              src={p.images?.[0] || '/solarpanel.png'}
                               alt={p.name}
                               width={48}
                               height={48}
@@ -898,24 +684,26 @@ export default function AdminDashboard() {
                             />
                             <span className="font-medium">{p.name}</span>
                           </td>
-                          <td className="py-6 text-gray-700 dark:text-gray-300">{p.orders}</td>
+                          <td className="py-6 text-gray-700 dark:text-gray-300">{p.orders || 0}</td>
                           <td className="py-6">
                             <span
                               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-                                p.status === 'Stock'
+                                (p.current_stock ?? 0) > 0
                                   ? 'bg-[#EAF8E7] text-[#4EA674]'
                                   : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                               }`}
                             >
                               <span
                                 className={`w-2.5 h-2.5 rounded-full ${
-                                  p.status === 'Stock' ? 'bg-[#4EA674]' : 'bg-red-600'
+                                  (p.current_stock ?? 0) > 0 ? 'bg-[#4EA674]' : 'bg-red-600'
                                 }`}
                               />
-                              {p.status === 'Stock' ? 'Stock' : 'Stock out'}
+                              {(p.current_stock ?? 0) > 0 ? 'Stock' : 'Stock out'}
                             </span>
                           </td>
-                          <td className="py-6 text-right font-bold">{formatCurrency(p.price)}</td>
+                          <td className="py-6 text-right font-bold">
+                            {formatCurrency(Number(p.sales_price_inc_tax))}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -961,10 +749,10 @@ export default function AdminDashboard() {
                     </div>
                   ))
                 ) : (
-                  topProducts.map((p, i) => (
-                    <div key={i} className="flex items-center gap-4">
+                  (topProducts || []).slice(0, 4).map((p) => (
+                    <div key={p.id} className="flex items-center gap-4">
                       <Image
-                        src={p.image}
+                        src={p.images?.[0] || '/solarpanel.png'}
                         alt={p.name}
                         width={64}
                         height={64}
@@ -973,9 +761,13 @@ export default function AdminDashboard() {
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{p.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Item: {p.itemCode}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Item: #{p.id}
+                        </p>
                       </div>
-                      <p className="font-bold text-[#4EA674] text-lg">{formatCurrency(p.price)}</p>
+                      <p className="font-bold text-[#4EA674] text-lg">
+                        {formatCurrency(Number(p.sales_price_inc_tax))}
+                      </p>
                     </div>
                   ))
                 )}
@@ -1011,7 +803,7 @@ export default function AdminDashboard() {
                       </div>
                     ))
                   ) : (
-                    categories.map((cat) => (
+                    (categories || []).slice(0, 3).map((cat) => (
                       <div
                         key={cat.id}
                         className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
@@ -1019,7 +811,7 @@ export default function AdminDashboard() {
                       >
                         <div className="flex items-center gap-4">
                           <Image
-                            src={cat.image}
+                            src={cat.image || '/solarpanel.png'}
                             alt={cat.name}
                             width={48}
                             height={48}
@@ -1058,14 +850,14 @@ export default function AdminDashboard() {
                       </div>
                     ))
                   ) : (
-                    topProducts.slice(0, 3).map((p, i) => (
+                    (topProducts || []).slice(0, 3).map((p) => (
                       <div
-                        key={i}
+                        key={p.id}
                         className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
                         <div className="flex items-center gap-4">
                           <Image
-                            src={p.image}
+                            src={p.images?.[0] || '/solarpanel.png'}
                             alt={p.name}
                             width={48}
                             height={48}
@@ -1074,7 +866,9 @@ export default function AdminDashboard() {
                           />
                           <div>
                             <p className="font-medium">{p.name}</p>
-                            <p className="text-sm text-[#4EA674] font-bold">{formatCurrency(p.price)}</p>
+                            <p className="text-sm text-[#4EA674] font-bold">
+                              {formatCurrency(Number(p.sales_price_inc_tax))}
+                            </p>
                           </div>
                         </div>
                         <button

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,80 +13,82 @@ import {
   ChevronRight,
   Loader2,
 } from 'lucide-react';
-import { customerApi } from '@/lib/customerApiClient';
-import { getCart, calcCartSummary, addToCart, emitCartUpdated } from '@/lib/cart';
 
-interface CartItem {
-  id: number;
-  product_id: number;
-  name: string;
-  image: string;
-  price: number;
-  quantity: number;
-  stock_status?: string;
-}
+// ---------- React Query Hooks ----------
+import { useCart, useUpdateCartItem, useRemoveCartItem, useCartSummary } from '@/hooks/useCart';
 
 export default function CartPage() {
   const router = useRouter();
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<Record<number, boolean>>({});
 
-  // ---------- Load Cart ----------
-  const loadCart = async () => {
-    setLoading(true);
-    try {
-      const cartItems = await getCart();
-      setItems(cartItems);
-    } catch (error) {
-      console.error('Failed to load cart:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ---------- React Query ----------
+  const {
+    data: items = [],
+    isLoading,
+    error,
+    refetch,
+  } = useCart();
 
-  useEffect(() => {
-    loadCart();
-  }, []);
+  const updateMutation = useUpdateCartItem();
+  const removeMutation = useRemoveCartItem();
 
-  // ---------- Update Quantity ----------
+  // ---------- Local UI state for loading indicators ----------
+  const [updatingItems, setUpdatingItems] = useState<Record<number, boolean>>({});
+
+  // ---------- Calculate summary ----------
+  const { count, total } = useCartSummary(items);
+
+  // ---------- Update Quantity Handler ----------
   const handleUpdateQuantity = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
-    setUpdating((prev) => ({ ...prev, [itemId]: true }));
+    setUpdatingItems((prev) => ({ ...prev, [itemId]: true }));
     try {
-      await customerApi.cart.update(itemId, newQuantity);
-      await loadCart(); // refresh
-      emitCartUpdated();
+      await updateMutation.mutateAsync({ itemId, quantity: newQuantity });
     } catch (error) {
       console.error('Failed to update quantity:', error);
     } finally {
-      setUpdating((prev) => ({ ...prev, [itemId]: false }));
+      setUpdatingItems((prev) => ({ ...prev, [itemId]: false }));
     }
   };
 
-  // ---------- Remove Item ----------
+  // ---------- Remove Item Handler ----------
   const handleRemoveItem = async (itemId: number) => {
     if (!confirm('Remove this item from cart?')) return;
-    setUpdating((prev) => ({ ...prev, [itemId]: true }));
+    setUpdatingItems((prev) => ({ ...prev, [itemId]: true }));
     try {
-      await customerApi.cart.remove(itemId);
-      await loadCart();
-      emitCartUpdated();
+      await removeMutation.mutateAsync(itemId);
     } catch (error) {
       console.error('Failed to remove item:', error);
     } finally {
-      setUpdating((prev) => ({ ...prev, [itemId]: false }));
+      setUpdatingItems((prev) => ({ ...prev, [itemId]: false }));
     }
   };
 
-  // ---------- Calculate Summary ----------
-  const { count, total } = calcCartSummary(items);
-
   // ---------- Loading State ----------
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-[#4EA674]" />
+      </div>
+    );
+  }
+
+  // ---------- Error State ----------
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-600 text-2xl">!</span>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Failed to load cart</h2>
+          <p className="text-gray-600 mb-6">{error instanceof Error ? error.message : 'Please try again'}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -138,79 +140,82 @@ export default function CartPage() {
           {/* ---------- Cart Items ---------- */}
           <div className="flex-1">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-col sm:flex-row gap-4 p-4 border-b border-gray-100 last:border-0"
-                >
-                  {/* Product Image */}
-                  <div className="relative w-full sm:w-24 h-24 flex-shrink-0">
-                    <Image
-                      src={item.image || '/offer.jpg'}
-                      alt={item.name}
-                      fill
-                      className="object-cover rounded-lg"
-                    />
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="flex-1 flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1">
-                      <Link
-                        href={`/products/${item.product_id}`}
-                        className="font-medium text-gray-900 hover:text-[#4EA674] transition line-clamp-2"
-                      >
-                        {item.name}
-                      </Link>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {item.stock_status === 'in_stock' ? 'In stock' : 'Limited stock'}
-                      </p>
+              {items.map((item) => {
+                const isUpdating = updatingItems[item.id] || updateMutation.isPending || removeMutation.isPending;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex flex-col sm:flex-row gap-4 p-4 border-b border-gray-100 last:border-0"
+                  >
+                    {/* Product Image */}
+                    <div className="relative w-full sm:w-24 h-24 flex-shrink-0">
+                      <Image
+                        src={item.image || '/offer.jpg'}
+                        alt={item.name}
+                        fill
+                        className="object-cover rounded-lg"
+                      />
                     </div>
 
-                    {/* Price */}
-                    <div className="text-right sm:text-left">
-                      <p className="text-lg font-bold text-[#4EA674]">
-                        ₦{item.price.toLocaleString()}
-                      </p>
-                    </div>
-
-                    {/* Quantity Controls */}
-                    <div className="flex items-center justify-between sm:justify-start gap-4">
-                      <div className="flex items-center border border-gray-300 rounded-lg">
-                        <button
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                          disabled={updating[item.id] || item.quantity <= 1}
-                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                    {/* Product Info */}
+                    <div className="flex-1 flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1">
+                        <Link
+                          href={`/products/${item.product_id}`}
+                          className="font-medium text-gray-900 hover:text-[#4EA674] transition line-clamp-2"
                         >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-10 text-center text-sm font-medium">
-                          {updating[item.id] ? (
-                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                          ) : (
-                            item.quantity
-                          )}
-                        </span>
-                        <button
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                          disabled={updating[item.id]}
-                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
+                          {item.name}
+                        </Link>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {item.stock_status === 'in_stock' ? 'In stock' : 'Limited stock'}
+                        </p>
                       </div>
 
-                      <button
-                        onClick={() => handleRemoveItem(item.id)}
-                        disabled={updating[item.id]}
-                        className="p-2 text-gray-400 hover:text-red-600 transition disabled:opacity-50"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {/* Price */}
+                      <div className="text-right sm:text-left">
+                        <p className="text-lg font-bold text-[#4EA674]">
+                          ₦{item.price.toLocaleString()}
+                        </p>
+                      </div>
+
+                      {/* Quantity Controls */}
+                      <div className="flex items-center justify-between sm:justify-start gap-4">
+                        <div className="flex items-center border border-gray-300 rounded-lg">
+                          <button
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                            disabled={isUpdating || item.quantity <= 1}
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="w-10 text-center text-sm font-medium">
+                            {isUpdating ? (
+                              <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                            ) : (
+                              item.quantity
+                            )}
+                          </span>
+                          <button
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                            disabled={isUpdating}
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => handleRemoveItem(item.id)}
+                          disabled={isUpdating}
+                          className="p-2 text-gray-400 hover:text-red-600 transition disabled:opacity-50"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="mt-6 flex justify-between items-center">

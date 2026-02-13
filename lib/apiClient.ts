@@ -57,11 +57,12 @@ export const api = {
     delete: (id: number) => authFetch(Endpoints.admin.productDetail(id), { method: 'DELETE' }).then(res => res.json()),
   },
 
-  orders: {
-    list: (params?: URLSearchParams) => authFetch(`${Endpoints.admin.orders}${params ? `?${params}` : ''}`).then(res => res.json()),
-    stats: () => authFetch(Endpoints.admin.orderStats).then(res => res.json()),
-    detail: (id: number) => authFetch(Endpoints.admin.orderDetail(id)).then(res => res.json()),
-  },
+ orders: {
+  list: (params?: URLSearchParams) => authFetch(`${Endpoints.admin.orders}${params ? `?${params}` : ''}`).then(res => res.json()),
+  stats: () => authFetch(Endpoints.admin.orderStats).then(res => res.json()),
+  detail: (id: number) => authFetch(Endpoints.admin.orderDetail(id)).then(res => res.json()),
+  delete: (id: string | number) => authFetch(Endpoints.admin.orderDetail(id), { method: 'DELETE' }).then(res => res.json()),
+},
 
   dashboard: {
     summary: () => authFetch(Endpoints.admin.dashboardSummary).then(res => res.json()),
@@ -91,6 +92,31 @@ export const api = {
     delete: (id: number) => authFetch(Endpoints.admin.staffMember(id), { method: 'DELETE' }).then(res => res.json()),
   },
 
+admin: {
+  users: {
+    list: (params?: URLSearchParams) => {
+      const url = params 
+        ? `${Endpoints.admin.users}?${params}` 
+        : Endpoints.admin.users;
+      return authFetch(url).then(res => res.json());
+    },
+    detail: (id: number | string) =>
+      authFetch(Endpoints.admin.userDetail(id)).then(res => res.json()),
+    create: (data: any) => {
+      const form = new FormData();
+      Object.keys(data).forEach(key => form.append(key, data[key]));
+      return authFetch(Endpoints.admin.users, { method: 'POST', body: form }).then(res => res.json());
+    },
+    update: (id: number | string, data: any) => {
+      const form = new FormData();
+      Object.keys(data).forEach(key => form.append(key, data[key]));
+      form.append('_method', 'PATCH');
+      return authFetch(Endpoints.admin.userDetail(id), { method: 'POST', body: form }).then(res => res.json());
+    },
+    delete: (id: number | string) =>
+      authFetch(Endpoints.admin.userDetail(id), { method: 'DELETE' }).then(res => res.json()),
+  },
+},
 
 transactions: {
   list: (params?: URLSearchParams) =>

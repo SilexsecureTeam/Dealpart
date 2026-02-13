@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
-import { api } from '@/lib/apiClient';
+import { useCategories, useCreateCategory, type Category } from '@/hooks/useCategories';
+import { useProducts, useDeleteProduct } from '@/hooks/useProducts';
+import { Product } from '@/types';
 import {
   Search,
   Bell,
@@ -18,8 +20,13 @@ import {
   X,
 } from 'lucide-react';
 
-// ---------- Reusable Components ----------
-const CategoryCard = ({ category, onClick }: any) => (
+// ---------- Reusable Components (fully typed) ----------
+interface CategoryCardProps {
+  category: Category;
+  onClick: () => void;
+}
+
+const CategoryCard = ({ category, onClick }: CategoryCardProps) => (
   <button
     onClick={onClick}
     className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-700 min-w-[140px] transition-all"
@@ -38,13 +45,20 @@ const CategoryCard = ({ category, onClick }: any) => (
   </button>
 );
 
-const ProductTableRow = ({ product, index, onEdit, onDelete }: any) => (
+interface ProductTableRowProps {
+  product: Product;
+  index: number;
+  onEdit: (product: Product) => void;
+  onDelete: (id: number, name: string) => void;
+}
+
+const ProductTableRow = ({ product, index, onEdit, onDelete }: ProductTableRowProps) => (
   <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
     <td className="px-4 py-4 font-medium text-gray-900 dark:text-white">{index}</td>
     <td className="px-4 py-4">
       <div className="flex items-center gap-3">
         <Image
-          src={product.image || '/solarpanel.png'}
+          src={product.images?.[0] || '/solarpanel.png'}
           alt={product.name}
           width={40}
           height={40}
@@ -58,7 +72,7 @@ const ProductTableRow = ({ product, index, onEdit, onDelete }: any) => (
       {product.created_at ? new Date(product.created_at).toLocaleDateString('en-GB') : '—'}
     </td>
     <td className="px-4 py-4 text-gray-900 dark:text-white hidden md:table-cell">
-      {product.orders ?? 0}
+      {product.current_stock ?? 0}
     </td>
     <td className="px-4 py-4">
       <div className="flex items-center gap-3">
@@ -87,12 +101,23 @@ export default function CategoriesPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // ---------- Data State ----------
-  const [categories, setCategories] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ---------- React Query ----------
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useCategories();
 
-  // ---------- UI State ----------
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useProducts(1, 999); // Fetch all products for filtering/search
+
+  const deleteProduct = useDeleteProduct();
+  const createCategory = useCreateCategory();
+
+  // ---------- Local UI State ----------
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
@@ -100,36 +125,15 @@ export default function CategoriesPage() {
   // ---------- Create Category Modal ----------
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [catName, setCatName] = useState('');
-  const [catSubmitting, setCatSubmitting] = useState(false);
   const [catError, setCatError] = useState<string | null>(null);
 
   // ---------- Toast / Message ----------
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // ---------- Fetch Data ----------
-  useEffect(() => {
-    setMounted(true);
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [cats, prods] = await Promise.all([
-          api.categories.list(),
-          api.products.list(),
-        ]);
-        setCategories(cats.data || cats || []);
-        setProducts(prods.data || prods || []);
-      } catch (error) {
-        setMessage({ type: 'error', text: 'Failed to load data' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  // ---------- Filter & Paginate ----------
-  const filteredProducts = products.filter((p) =>
-    (p.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+  // ---------- Derived Data ----------
+  const allProducts = productsData?.data || [];
+  const filteredProducts = allProducts.filter((p) =>
+    p.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const paginatedProducts = filteredProducts.slice(
@@ -137,47 +141,40 @@ export default function CategoriesPage() {
     page * itemsPerPage
   );
 
-  // Reset to page 1 when search changes
+  // ---------- Reset page when search changes ----------
   useEffect(() => {
     setPage(1);
   }, [searchQuery]);
 
-  // ---------- Create Category Handler ----------
+  // ---------- Handle Create Category ----------
   const handleCreateCategory = async () => {
     if (!catName.trim()) {
       setCatError('Category name is required');
       return;
     }
-    setCatSubmitting(true);
-    setCatError(null);
     try {
-      await api.categories.create(catName.trim());
-      // Refresh categories
-      const cats = await api.categories.list();
-      setCategories(cats.data || cats || []);
+      await createCategory.mutateAsync(catName.trim());
       setMessage({ type: 'success', text: 'Category created successfully' });
       setShowCreateModal(false);
       setCatName('');
+      setCatError(null);
     } catch (error) {
       setCatError('Failed to create category');
-    } finally {
-      setCatSubmitting(false);
     }
   };
 
-  // ---------- Delete Product Handler ----------
+  // ---------- Handle Delete Product ----------
   const handleDeleteProduct = async (id: number, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
     try {
-      await api.products.delete(id);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      await deleteProduct.mutateAsync(id);
       setMessage({ type: 'success', text: 'Product deleted successfully' });
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to delete product' });
     }
   };
 
-  // ---------- Clear message after 5 seconds ----------
+  // ---------- Auto‑dismiss Toast ----------
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(null), 5000);
@@ -185,7 +182,12 @@ export default function CategoriesPage() {
     }
   }, [message]);
 
-  // ---------- Initial Loading State ----------
+  // ---------- Mount ----------
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // ---------- Loading States ----------
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
@@ -193,6 +195,9 @@ export default function CategoriesPage() {
       </div>
     );
   }
+
+  const isLoading = categoriesLoading || productsLoading;
+  const hasError = categoriesError || productsError;
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
@@ -252,9 +257,6 @@ export default function CategoriesPage() {
         </div>
       </header>
 
-      {/* ---------- Mobile Search (optional) ---------- */}
-      {/* You can add a mobile search toggle here if needed */}
-
       <main className="p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
         {/* ---------- Toast Message ---------- */}
         {message && (
@@ -272,11 +274,17 @@ export default function CategoriesPage() {
           </div>
         )}
 
+        {/* ---------- Error Message ---------- */}
+        {hasError && (
+          <div className="mb-6 rounded-xl px-4 py-3 text-sm border bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300">
+            Failed to load data. Please refresh the page.
+          </div>
+        )}
+
         {/* ---------- Title & Actions ---------- */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Discover</h2>
           <div className="flex items-center gap-3">
-            {/* ✅ FIXED: Add Product → correct route */}
             <button
               onClick={() => router.push('/admin/product/add')}
               className="px-4 py-2.5 bg-[#4EA674] text-white rounded-full text-sm font-medium flex items-center gap-2 hover:bg-[#3D8B59] transition-colors"
@@ -293,27 +301,42 @@ export default function CategoriesPage() {
         <div className="relative mb-10 sm:mb-12">
           <div className="overflow-x-auto scroll-smooth pb-2 -mx-1 px-1">
             <div className="inline-grid grid-rows-2 grid-flow-col gap-3 sm:gap-4 auto-cols-[min(42vw,160px)]">
-              {/* ✅ FIXED: Create Category → opens modal */}
+              {/* Create Category Card */}
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-md border-2 border-dashed border-[#4EA674] min-w-[140px] transition-all"
+                disabled={createCategory.isPending}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-md border-2 border-dashed border-[#4EA674] min-w-[140px] transition-all disabled:opacity-50"
               >
                 <div className="w-12 h-12 rounded-lg bg-[#EAF8E7] dark:bg-[#2A4A2F] flex items-center justify-center flex-shrink-0">
-                  <PlusSquare className="w-6 h-6 text-[#4EA674]" />
+                  {createCategory.isPending ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-[#4EA674]" />
+                  ) : (
+                    <PlusSquare className="w-6 h-6 text-[#4EA674]" />
+                  )}
                 </div>
                 <span className="text-sm font-semibold text-[#4EA674] text-left">
-                  Create Category
+                  {createCategory.isPending ? 'Creating...' : 'Create Category'}
                 </span>
               </button>
 
               {/* Category Cards */}
-              {!loading &&
+              {!categoriesLoading &&
                 categories.map((cat) => (
                   <CategoryCard
                     key={cat.id}
                     category={cat}
                     onClick={() => router.push(`/admin/categories/${cat.id}`)}
                   />
+                ))}
+              {categoriesLoading &&
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 min-w-[140px] animate-pulse"
+                  >
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+                  </div>
                 ))}
             </div>
           </div>
@@ -343,12 +366,12 @@ export default function CategoriesPage() {
                   <th className="px-4 py-4 rounded-l-xl">No.</th>
                   <th className="px-4 py-4">Product</th>
                   <th className="px-4 py-4 hidden sm:table-cell">Created Date</th>
-                  <th className="px-4 py-4 hidden md:table-cell">Order</th>
+                  <th className="px-4 py-4 hidden md:table-cell">Stock</th>
                   <th className="px-4 py-4 rounded-r-xl">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {loading ? (
+                {isLoading ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-10 text-center text-gray-600 dark:text-gray-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#4EA674]" />
@@ -389,7 +412,6 @@ export default function CategoriesPage() {
               <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum = i + 1;
-                  // Smart pagination – show first, last, and around current
                   if (totalPages > 5) {
                     if (page <= 3) {
                       pageNum = i + 1;
@@ -432,13 +454,13 @@ export default function CategoriesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/50"
-            onClick={() => !catSubmitting && setShowCreateModal(false)}
+            onClick={() => !createCategory.isPending && setShowCreateModal(false)}
           />
           <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Create Category</h3>
               <button
-                onClick={() => !catSubmitting && setShowCreateModal(false)}
+                onClick={() => !createCategory.isPending && setShowCreateModal(false)}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
               >
                 <X className="w-5 h-5 text-gray-600 dark:text-gray-300" />
@@ -451,7 +473,7 @@ export default function CategoriesPage() {
               onChange={(e) => setCatName(e.target.value)}
               placeholder="e.g. Inverters"
               className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
-              disabled={catSubmitting}
+              disabled={createCategory.isPending}
               autoFocus
             />
 
@@ -462,17 +484,21 @@ export default function CategoriesPage() {
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowCreateModal(false)}
-                disabled={catSubmitting}
+                disabled={createCategory.isPending}
                 className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateCategory}
-                disabled={catSubmitting}
+                disabled={createCategory.isPending}
                 className="px-6 py-2.5 rounded-xl bg-[#4EA674] text-white hover:bg-[#3D8B59] disabled:opacity-50 flex items-center gap-2 min-w-[100px] justify-center"
               >
-                {catSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
+                {createCategory.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Create'
+                )}
               </button>
             </div>
           </div>

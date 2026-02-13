@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Your custom animations and utilities below */
 @keyframes fadeInDown {
   from {
     opacity: 0;
@@ -43,15 +44,17 @@
     transform: translateY(0);
   }
 }
+
 @layer utilities {
   .scrollbar-hide {
-    -ms-overflow-style: none;          
-    scrollbar-width: none;             
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   .scrollbar-hide::-webkit-scrollbar {
-    display: none;                     
+    display: none;
   }
 }
+
 @layer base {
   body,
   html,
@@ -62,7 +65,6 @@
       "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
   }
 
-  /* ✅ Global readable defaults (light + dark) */
   html,
   body {
     @apply bg-white text-gray-900;
@@ -73,7 +75,6 @@
     @apply bg-gray-950 text-gray-100;
   }
 
-  /* ✅ Default text contrast for common elements */
   p,
   li,
   label,
@@ -90,7 +91,6 @@
     @apply text-gray-200;
   }
 
-  /* ✅ Form fields readable in dark mode */
   input,
   textarea,
   select {
@@ -103,7 +103,6 @@
     @apply text-gray-100;
   }
 
-  /* ✅ Placeholder contrast */
   ::placeholder {
     @apply text-gray-400;
   }
@@ -121,7 +120,6 @@
   animation-delay: 0.2s;
 }
 
-/* Reusable animation utilities */
 .animate-fade-in-down {
   animation: fadeInDown 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
@@ -134,7 +132,6 @@
   animation: slowZoom 18s ease-in-out infinite alternate;
 }
 
-/* Delay helpers - use with animate-* classes */
 .animation-delay-300 {
   animation-delay: 0.3s;
 }
@@ -149,7 +146,6 @@
 }
 
 @layer components {
-  /* Buttons */
   .btn-primary {
     @apply bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-ambient transition-all duration-300;
   }
@@ -174,12 +170,10 @@
     @apply bg-secondary hover:bg-secondary/90 text-white font-bold rounded-full px-8 sm:px-10 md:px-12 py-4 sm:py-5 md:py-6 text-lg sm:text-xl shadow-ambient transition-all duration-300 hover:scale-105;
   }
 
-  /* Badges & Cards */
   .badge-hot {
     @apply absolute top-3 sm:top-4 left-3 sm:left-4 bg-red-600 text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-full shadow-md z-10;
   }
 
-  /* ✅ Cards now support dark mode */
   .card {
     @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl sm:rounded-2xl shadow-card hover:shadow-ambient transition-all duration-300;
   }
@@ -188,7 +182,6 @@
     @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl sm:rounded-2xl shadow-ambient hover:shadow-ambient-lg transition-all duration-400 hover:-translate-y-1;
   }
 
-  /* Layout helpers */
   .section-py {
     @apply py-16 sm:py-20 md:py-24 lg:py-28;
   }
@@ -197,7 +190,6 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
-  /* Common hover lift effect for product cards */
   .hover-lift {
     @apply transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl;
   }

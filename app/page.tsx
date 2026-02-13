@@ -3,10 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { ChevronRight, Heart, Star, Loader2 } from "lucide-react";
-import { customerApi } from "@/lib/customerApiClient";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Heart, Star, Loader2 } from "lucide-react";
 import { addToCart } from "@/lib/cart";
+import { useHomepageData } from "@/hooks/useHomepage";
+import { useWishlist, useAddToWishlist, useRemoveFromWishlist } from "@/hooks/useWishlist";
+import { Product, Category } from '@/types';
 
 function toNumberPrice(price: string | number) {
   if (typeof price === "number") return price;
@@ -15,166 +17,35 @@ function toNumberPrice(price: string | number) {
   return Number.isFinite(num) ? num : 0;
 }
 
-// ---------- Types ----------
-interface Product {
-  id: number;
-  name: string;
-  price: number;
-  sale_price?: number | null;
-  image: string;
-  rating?: number;
-  stock_status?: "in_stock" | "low_stock" | "out_of_stock";
-  stock_quantity?: number;
-  is_featured?: boolean;
-  is_hot?: boolean;
-  short_description?: string;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  image: string | null;
-}
-
-// ---------- Type‑Safe Fallback Data ----------
-const fallbackFeatured: Product[] = [
-  {
-    id: 1,
-    name: "Apex 550W Monocrystalline Panel",
-    price: 29.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "in_stock",
-  },
-  {
-    id: 2,
-    name: "Lithium LiFePO4 Battery 12V / 100Ah",
-    price: 40.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "low_stock",
-  },
-  {
-    id: 3,
-    name: "Solar Motion Sensor Light (24W)",
-    price: 119.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "in_stock",
-  },
-  {
-    id: 4,
-    name: "MPPT Charge Controller 60A",
-    price: 119.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "in_stock",
-  },
-];
-
-const fallbackNewArrivals: Product[] = [
-  {
-    id: 101,
-    name: "Apex 550W Monocrystalline Panel",
-    price: 29.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "High-efficiency solar panel",
-    is_featured: true,
-    is_hot: false,
-  },
-  {
-    id: 102,
-    name: "Lithium LiFePO4 Battery 12V / 100Ah",
-    price: 40.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "Safe, long-life lithium technology",
-    is_hot: true,
-    is_featured: false,
-  },
-  {
-    id: 103,
-    name: "Solar Motion Sensor Light (24W)",
-    price: 119.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "Smart motion-activated lighting",
-    is_hot: true,
-    is_featured: false,
-  },
-  {
-    id: 104,
-    name: "MPPT Charge Controller 60A",
-    price: 119.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "Maximum power point tracking",
-    is_hot: true,
-    is_featured: false,
-  },
-];
-
-const fallbackCategories: Category[] = [
-  { id: 1, name: "PV Solar Panels", image: "/solarpanel.png" },
-  { id: 2, name: "Inverters", image: "/solarpanel.png" },
-  { id: 3, name: "Batteries", image: "/solarpanel.png" },
-  { id: 4, name: "Charge Controllers", image: "/solarpanel.png" },
-  { id: 5, name: "Stabilizers", image: "/solarpanel.png" },
-  { id: 6, name: "Accessories", image: "/solarpanel.png" },
-];
-
 // ---------- Main Component ----------
 export default function LandingPage() {
   const router = useRouter();
   const pathname = usePathname();
   const [adding, setAdding] = useState<Record<number, boolean>>({});
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [newArrivals, setNewArrivals] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // ---------- Fetch Data ----------
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [productsData, categoriesData] = await Promise.allSettled([
-          customerApi.products.list(new URLSearchParams({ limit: "20" })),
-          customerApi.products.list(new URLSearchParams({ category: "all" })),
-        ]);
+  // ---------- React Query ----------
+  const {
+    featuredProducts,
+    newArrivals,
+    categories,
+    isLoading,
+    isError,
+    refetch,
+  } = useHomepageData();
 
-        if (productsData.status === "fulfilled") {
-          const allProducts = productsData.value.data || productsData.value.products || [];
-          setFeaturedProducts(allProducts.slice(0, 4));
-          setNewArrivals(allProducts.slice(4, 8));
-        } else {
-          setFeaturedProducts(fallbackFeatured);
-          setNewArrivals(fallbackNewArrivals);
-        }
+  const { data: wishlist = [] } = useWishlist();
+  const addToWishlist = useAddToWishlist();
+  const removeFromWishlist = useRemoveFromWishlist();
 
-        if (categoriesData.status === "fulfilled") {
-          const cats = categoriesData.value.data || categoriesData.value.categories || [];
-          setCategories(cats.slice(0, 6));
-        } else {
-          setCategories(fallbackCategories);
-        }
-      } catch (error) {
-        console.error("Failed to fetch landing page data:", error);
-        setFeaturedProducts(fallbackFeatured);
-        setNewArrivals(fallbackNewArrivals);
-        setCategories(fallbackCategories);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  // ---------- Wishlist Toggle ----------
+  const handleWishlistToggle = async (productId: number) => {
+    const item = wishlist.find((item) => item.product_id === productId);
+    if (item) {
+      await removeFromWishlist.mutateAsync(item.id);
+    } else {
+      await addToWishlist.mutateAsync(productId);
+    }
+  };
 
   // ---------- Add to Cart Handler ----------
   async function handleAddToCart(id: number, price: number) {
@@ -193,7 +64,18 @@ export default function LandingPage() {
     }
   }
 
-  if (loading) {
+  // ---------- Navigate to Shop ----------
+  const handleShopNow = () => {
+    router.push('/shop');
+  };
+
+  // ---------- Navigate to Category ----------
+  const handleCategoryShop = (categoryName: string) => {
+    const slug = categoryName.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/shop?category=${slug}`);
+  };
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <Loader2 className="w-12 h-12 animate-spin text-[#4EA674]" />
@@ -201,9 +83,26 @@ export default function LandingPage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Failed to load content</h2>
+          <p className="text-gray-600 mb-6">Please try again</p>
+          <button
+            onClick={() => refetch()}
+            className="px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-white">
-      {/* ---------- Hero Section ---------- */}
+      {/* ---------- Hero Section with Icons ---------- */}
       <section className="relative min-h-[70vh] flex items-center overflow-hidden">
         <Image
           src="/homebg.png"
@@ -213,6 +112,17 @@ export default function LandingPage() {
           className="object-cover scale-105 brightness-[0.92]"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#023337cc] via-[#02333788] to-transparent" />
+        
+        {/* Left Navigation Icon */}
+        <button className="absolute left-4 md:left-8 z-20 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition">
+          <ChevronLeft className="w-6 h-6 md:w-7 md:h-7 text-white" />
+        </button>
+        
+        {/* Right Navigation Icon */}
+        <button className="absolute right-4 md:right-8 z-20 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition">
+          <ChevronRight className="w-6 h-6 md:w-7 md:h-7 text-white" />
+        </button>
+
         <div className="relative z-10 container mx-auto px-5 sm:px-8 text-center text-white">
           <h1 className="text-4xl sm:text-2xl md:text-4xl lg:text-7xl font-black mb-6 leading-tight">
             Energy Independence Starts Here
@@ -220,7 +130,10 @@ export default function LandingPage() {
           <p className="text-lg sm:text-xl md:text-2xl mb-10 max-w-3xl text-white mx-auto">
             Spring Sale: Free Shipping on orders over ₦500,000.
           </p>
-          <button className="bg-[#4EA674] hover:bg-[#3D8B59] text-white font-bold px-10 py-5 rounded-full text-lg shadow-xl hover:shadow-2xl transition hover:scale-105">
+          <button 
+            onClick={handleShopNow}
+            className="bg-[#4EA674] hover:bg-[#3D8B59] text-white font-bold px-10 py-5 rounded-full text-lg shadow-xl hover:shadow-2xl transition hover:scale-105"
+          >
             Shop Now
           </button>
         </div>
@@ -244,7 +157,10 @@ export default function LandingPage() {
                   {categories[0]?.name || "Solar Panels"}
                 </h3>
                 <p className="text-base md:text-lg text-white mb-6">High-efficiency solar panels</p>
-                <button className="px-8 py-3 bg-white text-[#023337] font-bold rounded-full hover:bg-gray-100 transition">
+                <button 
+                  onClick={() => handleCategoryShop(categories[0]?.name || "Solar Panels")}
+                  className="px-8 py-3 bg-white text-[#023337] font-bold rounded-full hover:bg-gray-100 transition"
+                >
                   Shop Now
                 </button>
               </div>
@@ -264,7 +180,10 @@ export default function LandingPage() {
                   <h3 className="text-3xl md:text-4xl font-black mb-3">
                     {categories[1]?.name || "Inverters"}
                   </h3>
-                  <button className="px-6 py-3 bg-white text-[#023337] font-bold rounded-full hover:bg-gray-100 transition">
+                  <button 
+                    onClick={() => handleCategoryShop(categories[1]?.name || "Inverters")}
+                    className="px-6 py-3 bg-white text-[#023337] font-bold rounded-full hover:bg-gray-100 transition"
+                  >
                     Shop Now
                   </button>
                 </div>
@@ -272,7 +191,7 @@ export default function LandingPage() {
 
               {/* Charge Controllers & Batteries (third & fourth categories) */}
               <div className="grid grid-cols-2 gap-6">
-                {categories.slice(2, 4).map((cat) => (
+                {categories.slice(2, 4).map((cat: Category) => (
                   <div
                     key={cat.id}
                     className="relative rounded-xl overflow-hidden shadow-xl group aspect-square"
@@ -286,7 +205,10 @@ export default function LandingPage() {
                     <div className="absolute inset-0 bg-gradient-to-r from-[#023337]/90 via-[#023337]/50 to-transparent" />
                     <div className="absolute bottom-0 left-0 p-6 text-white">
                       <h3 className="text-2xl md:text-3xl font-black mb-2">{cat.name}</h3>
-                      <button className="px-4 py-2 bg-white text-[#023337] font-bold rounded-full hover:bg-gray-100 transition text-sm">
+                      <button 
+                        onClick={() => handleCategoryShop(cat.name)}
+                        className="px-4 py-2 bg-white text-[#023337] font-bold rounded-full hover:bg-gray-100 transition text-sm"
+                      >
                         Shop Now
                       </button>
                     </div>
@@ -305,14 +227,18 @@ export default function LandingPage() {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#023337]">
               The Best Offers
             </h2>
-            <button className="px-5 sm:px-6 py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm sm:text-base hover:bg-[#4EA674] hover:text-white transition">
+            <button 
+              onClick={() => router.push('/shop')}
+              className="px-5 sm:px-6 py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm sm:text-base hover:bg-[#4EA674] hover:text-white transition"
+            >
               View All
             </button>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-7 lg:gap-8">
-            {featuredProducts.map((p) => {
-              const priceVal = p.sale_price || p.price;
+            {featuredProducts.map((p: Product) => {
+              const priceVal = p.sale_price ?? p.price ?? 0;
+              const isInWishlist = wishlist.some((item) => item.product_id === p.id);
               const stockText =
                 p.stock_status === "low_stock"
                   ? "Only 4 left"
@@ -331,8 +257,12 @@ export default function LandingPage() {
                       fill
                       className="object-cover group-hover:scale-105 transition duration-500"
                     />
-                    <button className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow">
-                      <Heart className="w-5 h-5 text-[#023337]" />
+                    <button 
+                      onClick={() => handleWishlistToggle(p.id)}
+                      disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+                      className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition"
+                    >
+                      <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-[#023337]'}`} />
                     </button>
                   </div>
                   <div className="p-4 md:p-5">
@@ -362,7 +292,10 @@ export default function LandingPage() {
                       ₦{priceVal.toLocaleString()}
                     </p>
                     <div className="flex gap-3">
-                      <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2.5 rounded-full text-sm hover:bg-[#4EA674] hover:text-white transition">
+                      <button 
+                        onClick={() => router.push(`/products/${p.id}`)}
+                        className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2.5 rounded-full text-sm hover:bg-[#4EA674] hover:text-white transition"
+                      >
                         Details
                       </button>
                       <button
@@ -389,8 +322,12 @@ export default function LandingPage() {
           </h2>
           <div className="relative">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6 lg:gap-8">
-              {categories.slice(0, 6).map((cat) => (
-                <div key={cat.id} className="group cursor-pointer">
+              {categories.slice(0, 6).map((cat: Category) => (
+                <div 
+                  key={cat.id} 
+                  className="group cursor-pointer"
+                  onClick={() => handleCategoryShop(cat.name)}
+                >
                   <div className="relative aspect-[4/3] rounded-xl overflow-hidden shadow-md hover:shadow-xl transition">
                     <Image
                       src={cat.image || "/solarpanel.png"}
@@ -421,14 +358,18 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-4xl font-black text-[#023337]">New Arrivals</h2>
-            <button className="px-5 py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm md:text-base hover:bg-[#4EA674] hover:text-white transition">
+            <button 
+              onClick={() => router.push('/shop?sort=newest')}
+              className="px-5 py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm md:text-base hover:bg-[#4EA674] hover:text-white transition"
+            >
               View All
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-8">
-            {newArrivals.map((p) => {
-              const priceVal = p.sale_price || p.price;
+            {newArrivals.map((p: Product) => {
+              const priceVal = p.sale_price ?? p.price ?? 0;
+              const isInWishlist = wishlist.some((item) => item.product_id === p.id);
               const stockText =
                 p.stock_status === "low_stock"
                   ? "Only 4 left"
@@ -454,8 +395,12 @@ export default function LandingPage() {
                         Hot
                       </span>
                     )}
-                    <button className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white">
-                      <Heart className="w-5 h-5 text-gray-700" />
+                    <button 
+                      onClick={() => handleWishlistToggle(p.id)}
+                      disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+                      className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition"
+                    >
+                      <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-700'}`} />
                     </button>
                   </div>
 
@@ -494,7 +439,10 @@ export default function LandingPage() {
                     </p>
 
                     <div className="flex gap-3">
-                      <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2 rounded-full text-sm hover:bg-[#4EA674] hover:text-white transition">
+                      <button 
+                        onClick={() => router.push(`/products/${p.id}`)}
+                        className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-2 rounded-full text-sm hover:bg-[#4EA674] hover:text-white transition"
+                      >
                         View Details
                       </button>
                       <button
@@ -534,7 +482,10 @@ export default function LandingPage() {
               <p className="text-lg md:text-xl text-gray-700 mb-6">
                 Best automatic voltage regulators
               </p>
-              <button className="px-8 md:px-12 py-4 bg-[#023337] text-[#21C45D] font-bold rounded-full hover:bg-[#3D8B59] transition text-lg">
+              <button 
+                onClick={() => router.push('/shop?category=stabilizers')}
+                className="px-8 md:px-12 py-4 bg-[#023337] text-[#21C45D] font-bold rounded-full hover:bg-[#3D8B59] transition text-lg"
+              >
                 Shop Now
               </button>
             </div>
@@ -627,7 +578,10 @@ export default function LandingPage() {
                 </p>
 
                 <div className="mt-auto flex flex-col sm:flex-row gap-4">
-                  <button className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-3 rounded-full font-semibold hover:bg-[#4EA674] hover:text-white transition text-sm sm:text-base">
+                  <button 
+                    onClick={() => router.push(`/products/9999`)}
+                    className="flex-1 border-2 border-[#4EA674] text-[#4EA674] py-3 rounded-full font-semibold hover:bg-[#4EA674] hover:text-white transition text-sm sm:text-base"
+                  >
                     View Details
                   </button>
                   <button

@@ -1,11 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { customerApi } from "@/lib/customerApiClient";
 
-export default function RegisterPage() {
+// Move the logic that uses useSearchParams into a separate component
+function RegisterForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/";
@@ -21,7 +23,7 @@ export default function RegisterPage() {
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null); // store user_id from registration
+  const [userId, setUserId] = useState<string | null>(null);
 
   function update(k: string, v: string) {
     setForm((p) => ({ ...p, [k]: v }));
@@ -34,15 +36,11 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // ✅ Use customerApi.auth.register()
       const response = await customerApi.auth.register(form);
-      
-      // Extract user_id from response – adjust path based on your API
       const userId = response.user?.id || response.data?.user?.id || response.data?.id;
       if (userId) {
         setUserId(String(userId));
       }
-
       setStep(2);
       setMsg("Verification code sent to email");
     } catch (e: any) {
@@ -55,7 +53,6 @@ export default function RegisterPage() {
   async function submitStep2() {
     setLoading(true);
     try {
-      // ✅ Use customerApi.auth.verifyCode() with user_id
       await customerApi.auth.verifyCode(code, userId || undefined);
       router.push(next);
     } catch (e: any) {
@@ -137,11 +134,23 @@ export default function RegisterPage() {
 
         <p className="text-sm text-center mt-4">
           Already registered?{" "}
-          <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-[#4EA674] font-semibold">
+          <Link
+            href={`/login?next=${encodeURIComponent(next)}`}
+            className="text-[#4EA674] font-semibold"
+          >
             Login
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+// ✅ Wrap the form in Suspense
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

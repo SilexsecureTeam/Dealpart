@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Search,
   Bell,
@@ -12,103 +12,24 @@ import {
   Moon,
   Loader2,
   X,
-} from "lucide-react";
-import { useTheme } from "next-themes";
-import { api } from "@/lib/apiClient";
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
 
-type FilterType = "all" | "completed" | "pending" | "canceled";
+// ---------- React Query Hooks ----------
+import { useTransactionStats } from '@/hooks/useTransactionStats';
+import { useTransactions } from '@/hooks/useTransactions';
+import { AdminTransaction, TransactionStats } from '@/types';
 
-interface Transaction {
-  id: string;
-  customer_id: string;
-  customer_name: string;
-  date: string;
-  total: number;
-  payment_method: string;
-  status: "Complete" | "Pending" | "Canceled";
-}
-
-interface TransactionStats {
-  totalRevenue: number;
-  completedCount: number;
-  pendingCount: number;
-  failedCount: number;
-  totalRevenueChange: string;
-  completedChange: string;
-  pendingPercent: string;
-  failedPercent: string;
-}
-
-// ---------- Custom Hooks ----------
-const useTransactionStats = () => {
-  const [stats, setStats] = useState<TransactionStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStats = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.transactions.stats();
-      setStats(data);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load transaction statistics");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  return { stats, loading, error, refetch: fetchStats };
-};
-
-const useTransactions = (page: number, limit: number, filter: FilterType, search: string) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          ...(filter !== "all" && { status: filter }),
-          ...(debouncedSearch && { search: debouncedSearch }),
-        });
-        const data = await api.transactions.list(params);
-        setTransactions(data.transactions || []);
-        setTotal(data.total || 0);
-      } catch (err: any) {
-        setError(err?.message || "Failed to load transactions");
-        setTransactions([]);
-        setTotal(0);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTransactions();
-  }, [page, limit, filter, debouncedSearch]);
-
-  return { transactions, total, loading, error };
-};
+// ---------- Types ----------
+type FilterType = 'all' | 'completed' | 'pending' | 'canceled';
 
 // ---------- Helpers ----------
-const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
+const formatCurrency = (amount: number | undefined | null) => {
+  if (amount === undefined || amount === null) return '₦0';
+  return `₦${amount.toLocaleString()}`;
+};
 
-// ---------- Loading Skeletons (OUTSIDE component) ----------
+// ---------- Loading Skeletons ----------
 const StatCardSkeleton = () => (
   <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm animate-pulse">
     <div className="flex justify-between items-start mb-4">
@@ -142,28 +63,59 @@ export default function TransactionPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // UI State
-  const [filter, setFilter] = useState<FilterType>("all");
+  // ---------- Local State ----------
+  const [filter, setFilter] = useState<FilterType>('all');
   const [page, setPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const itemsPerPage = 10;
 
-  // Toast message
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // ---------- Toast Message ----------
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Data
-  const { stats, loading: statsLoading, error: statsError } = useTransactionStats();
+  // ---------- Debounce Search ----------
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // ---------- Reset page when filter or search changes ----------
+  useEffect(() => {
+    setPage(1);
+  }, [filter, debouncedSearch]);
+
+  // ---------- React Query ----------
   const {
-    transactions,
-    total,
-    loading: transactionsLoading,
-    error: transactionsError,
-  } = useTransactions(page, itemsPerPage, filter, searchQuery);
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useTransactionStats();
 
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    error: transactionsError,
+  } = useTransactions(page, itemsPerPage, filter, debouncedSearch);
+
+  const transactions = transactionsData?.transactions || [];
+  const total = transactionsData?.total || 0;
   const totalPages = Math.ceil(total / itemsPerPage);
 
-  // Clear message after 5s
+  // ---------- Error Handling ----------
+  useEffect(() => {
+    if (statsError) {
+      setMessage({ type: 'error', text: 'Failed to load transaction statistics' });
+    }
+  }, [statsError]);
+
+  useEffect(() => {
+    if (transactionsError) {
+      setMessage({ type: 'error', text: 'Failed to load transactions' });
+    }
+  }, [transactionsError]);
+
+  // ---------- Auto-dismiss Toast ----------
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(null), 5000);
@@ -171,27 +123,10 @@ export default function TransactionPage() {
     }
   }, [message]);
 
-  // Show errors in toast – dependencies are stable, so we disable lint
-  useEffect(() => {
-    if (statsError) setMessage({ type: "error", text: statsError });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsError]);
-
-  useEffect(() => {
-    if (transactionsError) setMessage({ type: "error", text: transactionsError });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactionsError]);
-
+  // ---------- Mount ----------
   useEffect(() => {
     setMounted(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Reset page when filter or search changes
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, searchQuery]);
 
   if (!mounted) {
     return (
@@ -203,7 +138,7 @@ export default function TransactionPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* ---------- Header (exact original) ---------- */}
+      {/* ---------- Header ---------- */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Transaction</h1>
 
@@ -233,18 +168,18 @@ export default function TransactionPage() {
           </button>
 
           <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             aria-label="Toggle dark mode"
           >
             <Sun
               className={`h-5 w-5 text-yellow-500 transition-all duration-300 ${
-                theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+                theme === 'dark' ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'
               }`}
             />
             <Moon
               className={`absolute inset-0 m-auto h-5 w-5 text-blue-400 transition-all duration-300 ${
-                theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                theme === 'dark' ? 'scale-100 rotate-0 opacity-100' : 'scale-0 -rotate-90 opacity-0'
               }`}
             />
           </button>
@@ -276,9 +211,9 @@ export default function TransactionPage() {
         {message && (
           <div
             className={`mb-6 rounded-xl px-4 py-3 text-sm border flex justify-between items-center ${
-              message.type === "success"
-                ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300"
-                : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300"
+              message.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300'
+                : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
             }`}
           >
             <span>{message.text}</span>
@@ -380,7 +315,7 @@ export default function TransactionPage() {
             )}
           </div>
 
-          {/* Payment Method Card – STATIC (same as original) */}
+          {/* Payment Method Card – STATIC (unchanged) */}
           <div className="lg:col-span-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm h-full flex flex-col">
               <div className="flex justify-between items-start mb-6">
@@ -449,33 +384,33 @@ export default function TransactionPage() {
               {/* Filter Tabs */}
               <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-auto">
                 <button
-                  onClick={() => { setFilter("all"); setPage(1); }}
+                  onClick={() => { setFilter('all'); setPage(1); }}
                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                    filter === "all" ? "bg-[#EAF8E7] text-[#4EA674] shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    filter === 'all' ? 'bg-[#EAF8E7] text-[#4EA674] shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
                   All order ({total})
                 </button>
                 <button
-                  onClick={() => { setFilter("completed"); setPage(1); }}
+                  onClick={() => { setFilter('completed'); setPage(1); }}
                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                    filter === "completed" ? "bg-[#EAF8E7] text-[#4EA674] shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    filter === 'completed' ? 'bg-[#EAF8E7] text-[#4EA674] shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
                   Completed
                 </button>
                 <button
-                  onClick={() => { setFilter("pending"); setPage(1); }}
+                  onClick={() => { setFilter('pending'); setPage(1); }}
                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                    filter === "pending" ? "bg-[#EAF8E7] text-[#4EA674] shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    filter === 'pending' ? 'bg-[#EAF8E7] text-[#4EA674] shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
                   Pending
                 </button>
                 <button
-                  onClick={() => { setFilter("canceled"); setPage(1); }}
+                  onClick={() => { setFilter('canceled'); setPage(1); }}
                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                    filter === "canceled" ? "bg-[#EAF8E7] text-[#4EA674] shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    filter === 'canceled' ? 'bg-[#EAF8E7] text-[#4EA674] shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
                   Canceled
@@ -539,9 +474,9 @@ export default function TransactionPage() {
                 ) : transactions.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-10 text-center text-gray-600 dark:text-gray-400">
-                      {searchQuery || filter !== "all"
-                        ? "No transactions match your criteria"
-                        : "No transactions yet"}
+                      {searchQuery || filter !== 'all'
+                        ? 'No transactions match your criteria'
+                        : 'No transactions yet'}
                     </td>
                   </tr>
                 ) : (
@@ -552,18 +487,20 @@ export default function TransactionPage() {
                         <td className="px-4 sm:px-6 py-5 font-medium text-gray-900 dark:text-white">#{tx.customer_id}</td>
                         <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white">{tx.customer_name}</td>
                         <td className="px-4 sm:px-6 py-5 text-gray-600 dark:text-gray-300">{tx.date}</td>
-                        <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white font-medium">{formatCurrency(tx.total)}</td>
+                        <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white font-medium">
+                          {formatCurrency(tx.total)}
+                        </td>
                         <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white">{tx.payment_method}</td>
                         <td className="px-4 sm:px-6 py-5">
                           <span className={`inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${
-                            tx.status === "Complete" ? "bg-[#EAF8E7] text-[#4EA674]" :
-                            tx.status === "Pending" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                            "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            tx.status === 'Complete' ? 'bg-[#EAF8E7] text-[#4EA674]' :
+                            tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                           }`}>
                             <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${
-                              tx.status === "Complete" ? "bg-[#4EA674]" :
-                              tx.status === "Pending" ? "bg-yellow-700" :
-                              "bg-red-700"
+                              tx.status === 'Complete' ? 'bg-[#4EA674]' :
+                              tx.status === 'Pending' ? 'bg-yellow-700' :
+                              'bg-red-700'
                             }`} />
                             {tx.status}
                           </span>
@@ -610,8 +547,8 @@ export default function TransactionPage() {
                       disabled={transactionsLoading}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium min-w-[36px] ${
                         page === pageNum
-                          ? "bg-[#C1E6BA] text-[#4EA674]"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          ? 'bg-[#C1E6BA] text-[#4EA674]'
+                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                     >
                       {pageNum}

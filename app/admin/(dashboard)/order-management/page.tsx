@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -19,36 +19,19 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { api } from '@/lib/apiClient';
+
+// ---------- React Query Hooks ----------
+import { useOrderStats } from '@/hooks/useOrderStats';
+import { useOrders } from '@/hooks/useOrders';
+import { OrderListItem, OrderStats } from '@/types';
 
 // ---------- Types ----------
 type FilterType = 'all' | 'completed' | 'pending' | 'canceled';
-type OrderStatus = 'Delivered' | 'Shipped' | 'Pending' | 'Cancelled';
-type PaymentStatus = 'Paid' | 'Unpaid';
 
-interface Order {
-  id: string;
-  order_id: string;
-  product_name: string;
-  product_image?: string;
-  date: string;
-  price: number;
-  payment_status: PaymentStatus;
-  order_status: OrderStatus;
-}
+// ---------- Helpers ----------
+const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
 
-interface OrderStats {
-  totalOrders: number;
-  newOrders: number;
-  completedOrders: number;
-  canceledOrders: number;
-  totalOrdersChange: string;
-  newOrdersChange: string;
-  completedPercent: string;
-  canceledChange: string;
-}
-
-// ---------- Loading Skeletons (OUTSIDE component) ----------
+// ---------- Loading Skeletons ----------
 const StatCardSkeleton = () => (
   <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm animate-pulse">
     <div className="flex justify-between items-start mb-2 sm:mb-4">
@@ -100,125 +83,77 @@ const MobileCardSkeleton = () => (
   </div>
 );
 
-// ---------- Custom Hooks ----------
-const useOrderStats = () => {
-  const [stats, setStats] = useState<OrderStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStats = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.orders.stats();
-      setStats(data);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load order statistics');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  return { stats, loading, error, refetch: fetchStats };
-};
-
-const useOrders = (page: number, limit: number, filter: FilterType, search: string) => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          ...(filter !== 'all' && { status: filter }),
-          ...(debouncedSearch && { search: debouncedSearch }),
-        });
-        const data = await api.orders.list(params);
-        setOrders(data.orders || []);
-        setTotal(data.total || 0);
-      } catch (err: any) {
-        setError(err?.message || 'Failed to load orders');
-        setOrders([]);
-        setTotal(0);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
-  }, [page, limit, filter, debouncedSearch]);
-
-  return { orders, total, loading, error };
-};
-
-// ---------- Helper ----------
-const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
-
 // ---------- Main Page ----------
 export default function OrderManagementPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  // ---------- Local State ----------
   const [filter, setFilter] = useState<FilterType>('all');
   const [page, setPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const itemsPerPage = 10;
-
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const { stats, loading: statsLoading, error: statsError } = useOrderStats();
-  const { orders, total, loading: ordersLoading, error: ordersError } = useOrders(
-    page,
-    itemsPerPage,
-    filter,
-    searchQuery
-  );
+  const itemsPerPage = 10;
 
+  // ---------- Debounce Search ----------
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // ---------- Reset page when filter or search changes ----------
+  useEffect(() => {
+    setPage(1);
+  }, [filter, debouncedSearch]);
+
+  // ---------- React Query ----------
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useOrderStats();
+
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useOrders(page, itemsPerPage, filter, debouncedSearch);
+
+const orders = (ordersData?.orders || []) as OrderListItem[];
+  const total = ordersData?.total || 0;
   const totalPages = Math.ceil(total / itemsPerPage);
 
-  // ---------- Effects with eslint-disable comments ----------
+  // ---------- Error Handling ----------
   useEffect(() => {
-    if (statsError) setMessage({ type: 'error', text: statsError });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (statsError) {
+      setMessage({ type: 'error', text: 'Failed to load order statistics' });
+    }
   }, [statsError]);
 
   useEffect(() => {
-    if (ordersError) setMessage({ type: 'error', text: ordersError });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (ordersError) {
+      setMessage({ type: 'error', text: 'Failed to load orders' });
+    }
   }, [ordersError]);
 
-  useEffect(() => {
-    setMounted(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, searchQuery]);
-
+  // ---------- Auto-dismiss Toast ----------
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [message]);
+
+  // ---------- Mount ----------
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!mounted) {
     return (
@@ -446,10 +381,7 @@ export default function OrderManagementPage() {
             {(['all', 'completed', 'pending', 'canceled'] as FilterType[]).map((type) => (
               <button
                 key={type}
-                onClick={() => {
-                  setFilter(type);
-                  setPage(1);
-                }}
+                onClick={() => setFilter(type)}
                 className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
                   filter === type
                     ? 'bg-[#C1E6BA] text-[#4EA674]'

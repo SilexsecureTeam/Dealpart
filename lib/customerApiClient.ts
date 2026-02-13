@@ -1,4 +1,5 @@
 import { Endpoints } from './endpoints';
+import { CheckoutPayload, CheckoutResponse, VerifyPaymentResponse } from '@/types';
 
 // ---------- Customer Auth Helpers ----------
 const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('customerToken') : null);
@@ -79,7 +80,7 @@ export const customerApi = {
       const json = await res.json();
 
       if (!res.ok) {
-        // ✅ Safe error extraction – no more TypeScript error
+        // ✅ Safe error extraction with fallback
         let errorMessage = json?.message || 'Registration failed';
         if (json?.errors && typeof json.errors === 'object') {
           const values = Object.values(json.errors);
@@ -161,14 +162,13 @@ export const customerApi = {
       }).then((res) => res.json()),
   },
 
+ 
   // 🛒 Cart
   cart: {
     get: () => authFetch(Endpoints.customer.cart).then((res) => res.json()),
-
     add: async (product_id: number, quantity: number, price: number) => {
       const token = getToken();
       if (!token) throw new Error('LOGIN_REQUIRED');
-
       const res = await authFetch(Endpoints.customer.cartAdd, {
         method: 'POST',
         body: JSON.stringify({ product_id, quantity, price }),
@@ -177,16 +177,55 @@ export const customerApi = {
       if (!res.ok) throw new Error(json?.message || 'Failed to add to cart');
       return json;
     },
-
     update: (id: number, quantity: number) =>
       authFetch(Endpoints.customer.cartUpdate(id), {
         method: 'PUT',
         body: JSON.stringify({ quantity }),
       }).then((res) => res.json()),
-
     remove: (id: number) =>
       authFetch(Endpoints.customer.cartRemove(id), {
         method: 'DELETE',
       }).then((res) => res.json()),
   },
+
+  // ✅ CHECKOUT – new
+  checkout: {
+    create: (data: CheckoutPayload): Promise<CheckoutResponse> =>
+      authFetch(Endpoints.customer.checkout, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((res) => res.json()),
+    verify: (reference: string): Promise<VerifyPaymentResponse> =>
+      authFetch(`${Endpoints.customer.verifyPayment}/${reference}`, {
+        method: 'GET',
+      }).then((res) => res.json()),
+  },
+
+  // ✅ COUPONS – new
+  coupons: {
+    apply: (code: string) =>
+      authFetch(`${Endpoints.customer.coupons}/apply`, {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      }).then((res) => res.json()),
+  },
+// ---------- Wishlist ----------
+wishlist: {
+  list: (params?: URLSearchParams) => {
+    const url = params
+      ? `${Endpoints.customer.wishlist}?${params}`
+      : Endpoints.customer.wishlist;
+    return authFetch(url).then((res) => res.json());
+  },
+  add: (productId: number) =>
+    authFetch(Endpoints.customer.wishlist, {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId }),
+    }).then((res) => res.json()),
+  remove: (id: number) =>
+    authFetch(Endpoints.customer.wishlistItem(id), {
+      method: 'DELETE',
+    }).then((res) => res.json()),
+},
+
 } as const;
