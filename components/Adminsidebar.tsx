@@ -14,10 +14,10 @@ const mainMenu = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
   { icon: Package, label: "Order Management", path: "/admin/order-management" },
   { icon: Users, label: "Customers", path: "/admin/customers" },
-  { icon: Tag, label: "Coupon Code", path: "/admin/coupons" },
+  { icon: Tag, label: "Coupon Code", path: "/admin/coupon" },
   { icon: Layers, label: "Categories", path: "/admin/categories" },
   { icon: Receipt, label: "Transaction", path: "/admin/transaction" },
-  { icon: Star, label: "Brand", path: "/admin/brands" },
+  { icon: Star, label: "Brand", path: "/admin/brand" },
 ];
 
 const productMenu = [

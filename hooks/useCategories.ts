@@ -23,7 +23,7 @@ export const useCategories = () => {
       const list = Array.isArray(response) ? response : response?.data || [];
       return list as Category[];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -31,7 +31,40 @@ export const useCategories = () => {
 export const useCreateCategory = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api.categories.create(name),
+    mutationFn: async (data: string | FormData) => {
+      if (typeof data === 'string') {
+        return api.categories.create(data);
+      }
+      // Use the new method that supports full FormData
+      return api.categories.createWithDetails(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
+    },
+  });
+};
+
+// ---------- Update a category ----------
+export const useUpdateCategory = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: FormData }) => {
+      // Use the new method that supports full FormData
+      return api.categories.updateWithDetails(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
+    },
+  });
+};
+
+// ---------- Delete a category ----------
+export const useDeleteCategory = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      return api.categories.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
     },

@@ -1,3 +1,4 @@
+// lib/apiClient.ts
 import { Endpoints } from './endpoints';
 
 const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
@@ -40,12 +41,83 @@ export const api = {
       const form = new FormData(); form.append('name', name);
       return authFetch(Endpoints.admin.categories, { method: 'POST', body: form }).then(res => res.json());
     },
+    createWithDetails: (formData: FormData) => {
+      return authFetch(Endpoints.admin.categories, { method: 'POST', body: formData }).then(res => res.json());
+    },
     update: (id: number, name: string) => {
       const form = new FormData(); form.append('name', name); form.append('_method', 'PATCH');
       return authFetch(Endpoints.admin.categoryDetail(id), { method: 'POST', body: form }).then(res => res.json());
     },
+    updateWithDetails: (id: number, formData: FormData) => {
+      formData.append('_method', 'PATCH');
+      return authFetch(Endpoints.admin.categoryDetail(id), { method: 'POST', body: formData }).then(res => res.json());
+    },
     delete: (id: number) => authFetch(Endpoints.admin.categoryDetail(id), { method: 'DELETE' }).then(res => res.json()),
   },
+
+  // BRANDS SECTION - FIXED with correct endpoints
+  brands: {
+    list: () => authFetch(Endpoints.admin.brand).then(res => res.json()),
+    
+    create: (formData: FormData) => {
+      return authFetch(Endpoints.admin.brand, { 
+        method: 'POST', 
+        body: formData 
+      }).then(res => res.json());
+    },
+    
+    update: (id: number, formData: FormData) => {
+      formData.append('_method', 'PUT');
+      return authFetch(Endpoints.admin.brandDetail(id), { 
+        method: 'POST', 
+        body: formData 
+      }).then(res => res.json());
+    },
+    
+    delete: (id: number) => authFetch(Endpoints.admin.brandDetail(id), { 
+      method: 'DELETE' 
+    }).then(res => res.json()),
+    
+    get: (id: number) => authFetch(Endpoints.admin.brandDetail(id)).then(res => res.json()),
+  },
+
+
+
+coupons: {
+  list: () => authFetch(Endpoints.admin.coupons).then(res => res.json()),
+  
+  get: (id: number) => authFetch(Endpoints.admin.couponDetail(id)).then(res => res.json()),
+  
+  create: (formData: FormData) => {
+    return authFetch(Endpoints.admin.coupons, { 
+      method: 'POST', 
+      body: formData 
+    }).then(res => res.json());
+  },
+  
+  update: (id: number, formData: FormData) => {
+    formData.append('_method', 'PUT');
+    return authFetch(Endpoints.admin.couponDetail(id), { 
+      method: 'POST', 
+      body: formData 
+    }).then(res => res.json());
+  },
+  
+  delete: (id: number) => authFetch(Endpoints.admin.couponDetail(id), { 
+    method: 'DELETE' 
+  }).then(res => res.json()),
+  
+  toggleStatus: (id: number, is_active: boolean) => {
+    const formData = new FormData();
+    formData.append('is_active', String(is_active));
+    formData.append('_method', 'PATCH');
+    return authFetch(Endpoints.admin.couponToggle(id), { 
+      method: 'POST', 
+      body: formData 
+    }).then(res => res.json());
+  },
+},
+
 
   products: {
     list: () => authFetch(Endpoints.admin.products).then(res => res.json()),
@@ -57,12 +129,12 @@ export const api = {
     delete: (id: number) => authFetch(Endpoints.admin.productDetail(id), { method: 'DELETE' }).then(res => res.json()),
   },
 
- orders: {
-  list: (params?: URLSearchParams) => authFetch(`${Endpoints.admin.orders}${params ? `?${params}` : ''}`).then(res => res.json()),
-  stats: () => authFetch(Endpoints.admin.orderStats).then(res => res.json()),
-  detail: (id: number) => authFetch(Endpoints.admin.orderDetail(id)).then(res => res.json()),
-  delete: (id: string | number) => authFetch(Endpoints.admin.orderDetail(id), { method: 'DELETE' }).then(res => res.json()),
-},
+  orders: {
+    list: (params?: URLSearchParams) => authFetch(`${Endpoints.admin.orders}${params ? `?${params}` : ''}`).then(res => res.json()),
+    stats: () => authFetch(Endpoints.admin.orderStats).then(res => res.json()),
+    detail: (id: number) => authFetch(Endpoints.admin.orderDetail(id)).then(res => res.json()),
+    delete: (id: string | number) => authFetch(Endpoints.admin.orderDetail(id), { method: 'DELETE' }).then(res => res.json()),
+  },
 
   dashboard: {
     summary: () => authFetch(Endpoints.admin.dashboardSummary).then(res => res.json()),
@@ -92,39 +164,34 @@ export const api = {
     delete: (id: number) => authFetch(Endpoints.admin.staffMember(id), { method: 'DELETE' }).then(res => res.json()),
   },
 
-admin: {
-  users: {
-    list: (params?: URLSearchParams) => {
-      const url = params 
-        ? `${Endpoints.admin.users}?${params}` 
-        : Endpoints.admin.users;
-      return authFetch(url).then(res => res.json());
+  admin: {
+    users: {
+      list: (params?: URLSearchParams) => {
+        const url = params ? `${Endpoints.admin.users}?${params}` : Endpoints.admin.users;
+        return authFetch(url).then(res => res.json());
+      },
+      detail: (id: number | string) => authFetch(Endpoints.admin.userDetail(id)).then(res => res.json()),
+      create: (data: any) => {
+        const form = new FormData();
+        Object.keys(data).forEach(key => form.append(key, data[key]));
+        return authFetch(Endpoints.admin.users, { method: 'POST', body: form }).then(res => res.json());
+      },
+      update: (id: number | string, data: any) => {
+        const form = new FormData();
+        Object.keys(data).forEach(key => form.append(key, data[key]));
+        form.append('_method', 'PATCH');
+        return authFetch(Endpoints.admin.userDetail(id), { method: 'POST', body: form }).then(res => res.json());
+      },
+      delete: (id: number | string) => authFetch(Endpoints.admin.userDetail(id), { method: 'DELETE' }).then(res => res.json()),
     },
-    detail: (id: number | string) =>
-      authFetch(Endpoints.admin.userDetail(id)).then(res => res.json()),
-    create: (data: any) => {
-      const form = new FormData();
-      Object.keys(data).forEach(key => form.append(key, data[key]));
-      return authFetch(Endpoints.admin.users, { method: 'POST', body: form }).then(res => res.json());
-    },
-    update: (id: number | string, data: any) => {
-      const form = new FormData();
-      Object.keys(data).forEach(key => form.append(key, data[key]));
-      form.append('_method', 'PATCH');
-      return authFetch(Endpoints.admin.userDetail(id), { method: 'POST', body: form }).then(res => res.json());
-    },
-    delete: (id: number | string) =>
-      authFetch(Endpoints.admin.userDetail(id), { method: 'DELETE' }).then(res => res.json()),
   },
-},
 
-transactions: {
-  list: (params?: URLSearchParams) =>
-    authFetch(`${Endpoints.admin.transactions}${params ? `?${params}` : ''}`).then(res => res.json()),
-  stats: () => authFetch(Endpoints.admin.transactionStats).then(res => res.json()),
-  detail: (id: number) =>
-    authFetch(Endpoints.admin.transactionDetail(id)).then(res => res.json()),
-},
+  transactions: {
+    list: (params?: URLSearchParams) =>
+      authFetch(`${Endpoints.admin.transactions}${params ? `?${params}` : ''}`).then(res => res.json()),
+    stats: () => authFetch(Endpoints.admin.transactionStats).then(res => res.json()),
+    detail: (id: number) => authFetch(Endpoints.admin.transactionDetail(id)).then(res => res.json()),
+  },
 
   inventory: {
     import: (file: File) => {
