@@ -21,15 +21,28 @@ const fallbackProducts: CustomerProduct[] = [
   { id: 8, name: 'MPPT Charge Controller 60A Pro', slug: 'mppt-charge-controller-60a-pro', price: 11399, image: '/offer.jpg', rating: 4.8, stock_status: 'in_stock', brand: 'SolarMax' },
 ];
 
-const brandOptions = [
-  'All Brands',
-  ...Array.from(new Set(fallbackProducts.map((p) => p.brand).filter(Boolean))),
-];
-
 // Helper function to safely get image URL
 const getSafeImageUrl = (image: string | null | undefined): string | null => {
-  if (!image || image.trim() === '') return null;
+  if (!image || typeof image !== 'string' || image.trim() === '') return null;
   return image;
+};
+
+// Helper function to safely get brand string
+const getSafeBrand = (brand: any): string => {
+  if (!brand || typeof brand !== 'string') return 'Other';
+  return brand.trim() || 'Other';
+};
+
+// Helper function to safely create brand options
+const getBrandOptions = (products: CustomerProduct[]): string[] => {
+  const brands = products
+    .map(p => p.brand)
+    .filter((brand): brand is string => 
+      brand != null && typeof brand === 'string' && brand.trim() !== ''
+    )
+    .map(brand => brand.trim());
+  
+  return ['All Brands', ...Array.from(new Set(brands))];
 };
 
 export default function ShopPage() {
@@ -48,22 +61,30 @@ export default function ShopPage() {
   const [applyFilter, setApplyFilter] = useState(false);
   const [sortBy, setSortBy] = useState('default');
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [brandOptions, setBrandOptions] = useState<string[]>(['All Brands']);
 
-  // 🔥 FIXED: Only update when products actually change
+  // Update brand options when products change
+  useEffect(() => {
+    const sourceProducts = products.length > 0 ? products : fallbackProducts;
+    setBrandOptions(getBrandOptions(sourceProducts));
+  }, [products]);
+
+  // Update display products when products change
   useEffect(() => {
     if (products && products.length > 0) {
       setDisplayProducts(products);
     }
-  }, [products]); // ✅ Only depend on products, not displayProducts
+  }, [products]);
 
-  // 🔥 FIXED: Filter effect with proper dependencies
+  // Filter and sort products
   useEffect(() => {
-    let result = [...displayProducts];
+    const sourceProducts = products.length > 0 ? products : fallbackProducts;
+    let result = [...sourceProducts];
     
     if (applyFilter) {
       result = result.filter((p) => p.price <= priceMax);
       if (brand !== 'All Brands') {
-        result = result.filter((p) => p.brand === brand);
+        result = result.filter((p) => getSafeBrand(p.brand) === brand);
       }
     }
 
@@ -81,7 +102,7 @@ export default function ShopPage() {
     }
 
     setDisplayProducts(result);
-  }, [priceMax, brand, sortBy, applyFilter]); // ✅ Only run when these change
+  }, [products, priceMax, brand, sortBy, applyFilter]);
 
   // Reset filter flag when filters change
   useEffect(() => {
@@ -95,11 +116,15 @@ export default function ShopPage() {
 
   // Wishlist toggle
   const handleWishlistToggle = async (productId: number) => {
-    const item = wishlist.find((item) => item.product_id === productId);
-    if (item) {
-      await removeFromWishlist.mutateAsync(item.id);
-    } else {
-      await addToWishlist.mutateAsync(productId);
+    try {
+      const item = wishlist.find((item) => item.product_id === productId);
+      if (item) {
+        await removeFromWishlist.mutateAsync(item.id);
+      } else {
+        await addToWishlist.mutateAsync(productId);
+      }
+    } catch (error) {
+      console.error('Wishlist error:', error);
     }
   };
 
@@ -193,7 +218,9 @@ export default function ShopPage() {
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4EA674] text-gray-700"
             >
               {brandOptions.map((b) => (
-                <option key={b}>{b}</option>
+                <option key={b} value={b}>
+                  {b}
+                </option>
               ))}
             </select>
           </aside>
@@ -203,7 +230,7 @@ export default function ShopPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">All Products</h1>
               <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
-                <span>Showing {displayProducts.length} / {products?.length || 0}</span>
+                <span>Showing {displayProducts.length} / {products?.length || fallbackProducts.length}</span>
                 <div className="relative">
                   <select
                     value={sortBy}
@@ -234,11 +261,10 @@ export default function ShopPage() {
                   return (
                     <div key={p.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
                       <div className="relative pt-[75%] bg-gray-100">
-                        {/* FIXED: Conditional image rendering with fallback */}
                         {safeImageUrl && !hasImageError ? (
                           <Image 
                             src={safeImageUrl} 
-                            alt={p.name} 
+                            alt={p.name || 'Product'} 
                             fill 
                             className="object-cover"
                             onError={() => handleImageError(p.id)}
@@ -246,7 +272,7 @@ export default function ShopPage() {
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-4xl font-bold text-[#4EA674]/30">
-                              {p.name.charAt(0)}
+                              {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
                             </span>
                           </div>
                         )}
@@ -260,7 +286,7 @@ export default function ShopPage() {
                         </button>
                       </div>
                       <div className="p-4">
-                        <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1">{p.name}</h3>
+                        <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1">{p.name || 'Unnamed Product'}</h3>
                         <div className="flex items-center gap-1 mb-2">
                           {[...Array(5)].map((_, i) => (
                             <Star
@@ -288,17 +314,17 @@ export default function ShopPage() {
                             ? 'Low stock'
                             : 'Out of stock'}
                         </p>
-                        <p className="text-xl font-bold text-[#4EA674] mb-4">₦{p.price.toLocaleString()}</p>
+                        <p className="text-xl font-bold text-[#4EA674] mb-4">₦{(p.price || 0).toLocaleString()}</p>
                         <div className="flex gap-3">
                           <Link
-                            href={`/products/${p.slug || createSlug(p.name)}`}
+                            href={`/products/${p.slug || (p.name ? createSlug(p.name) : 'product')}`}
                             className="flex-1 text-center py-2 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-medium hover:bg-[#4EA674]/10 transition"
                           >
                             View Details
                           </Link>
                           <button
-                            onClick={() => handleAddToCart(p.id, p.price)}
-                            disabled={adding[p.id]}
+                            onClick={() => handleAddToCart(p.id, p.price || 0)}
+                            disabled={adding[p.id] || p.stock_status === 'out_of_stock'}
                             className="flex-1 bg-[#4EA674] text-white py-2 rounded-full text-sm font-medium hover:bg-[#3e8c5f] transition disabled:opacity-60"
                           >
                             {adding[p.id] ? 'Adding...' : 'Add to Cart'}
