@@ -1,40 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Heart, Trash2, ShoppingBag, ChevronRight, Loader2 } from 'lucide-react';
+import { Heart, Trash2, ChevronRight, Loader2 } from 'lucide-react';
 import { useWishlist, useRemoveFromWishlist } from '@/hooks/useWishlist';
 import { addToCart } from '@/lib/cart';
 
 export default function WishlistPage() {
   const router = useRouter();
   const [adding, setAdding] = useState<Record<number, boolean>>({});
+  const [removing, setRemoving] = useState<Record<number, boolean>>({});
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const { data: wishlist = [], isLoading, error, refetch } = useWishlist();
   const removeMutation = useRemoveFromWishlist();
 
-  // ---------- Add to Cart from Wishlist ----------
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const handleAddToCart = async (productId: number, price: number) => {
     try {
       setAdding((prev) => ({ ...prev, [productId]: true }));
       await addToCart(productId, 1, price);
-      alert('Added to cart ✅');
+      setMessage({ type: 'success', text: 'Added to cart successfully!' });
     } catch (e: any) {
-      alert(e?.message || 'Failed to add to cart');
+      console.error('Add to cart error:', e);
+      if (e?.message === 'LOGIN_REQUIRED' || e?.message === 'SESSION_EXPIRED') {
+        router.push(`/login?next=${encodeURIComponent('/wishlist')}`);
+        return;
+      }
+      setMessage({ type: 'error', text: e?.message || 'Failed to add to cart' });
     } finally {
       setAdding((prev) => ({ ...prev, [productId]: false }));
     }
   };
 
-  // ---------- Remove from Wishlist ----------
-  const handleRemove = async (id: number, productName: string) => {
+  const handleRemove = async (wishlistItemId: number, productName: string) => {
     if (!confirm(`Remove "${productName}" from wishlist?`)) return;
+    
     try {
-      await removeMutation.mutateAsync(id);
-    } catch (error) {
-      alert('Failed to remove item');
+      setRemoving((prev) => ({ ...prev, [wishlistItemId]: true }));
+      
+      console.log('Attempting to remove wishlist item with ID:', wishlistItemId);
+      
+      await removeMutation.mutateAsync(wishlistItemId);
+      
+      // Don't show success message if the item was already removed
+      setMessage({ type: 'success', text: 'Item removed from wishlist' });
+    } catch (error: any) {
+      console.error('Remove from wishlist error:', error);
+      
+      // If the item wasn't found, it might have been already removed
+      if (error?.message?.includes('not found')) {
+        setMessage({ type: 'success', text: 'Item removed from wishlist' });
+        // Refetch to update the UI
+        await refetch();
+      } else {
+        setMessage({ type: 'error', text: error?.message || 'Failed to remove item' });
+      }
+    } finally {
+      setRemoving((prev) => ({ ...prev, [wishlistItemId]: false }));
     }
   };
 
@@ -53,7 +84,7 @@ export default function WishlistPage() {
         <p className="text-gray-600 mb-6">{(error as Error).message}</p>
         <button
           onClick={() => refetch()}
-          className="px-6 py-3 bg-[#4EA674] text-white rounded-lg"
+          className="px-6 py-3 bg-[#4EA674] text-white rounded-lg hover:bg-[#3D8B59] transition"
         >
           Try Again
         </button>
@@ -73,7 +104,7 @@ export default function WishlistPage() {
             <p className="text-gray-600 mb-6">Save your favorite items here.</p>
             <Link
               href="/shop"
-              className="inline-block px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium"
+              className="inline-block px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
             >
               Continue Shopping
             </Link>
@@ -85,7 +116,18 @@ export default function WishlistPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Breadcrumb */}
+      {message && (
+        <div className="fixed top-4 right-4 z-50 max-w-sm animate-slideIn">
+          <div className={`rounded-lg shadow-lg px-4 py-3 ${
+            message.type === 'success' 
+              ? 'bg-green-50 border border-green-200 text-green-700' 
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}>
+            {message.text}
+          </div>
+        </div>
+      )}
+
       <div className="bg-gray-50 border-b">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -106,14 +148,19 @@ export default function WishlistPage() {
               name: 'Product',
               price: 0,
               image: '/offer.jpg',
+              slug: ''
             };
-            // ✅ Safe price – fallback to 0 if undefined
+            
             const price = product.price ?? 0;
+            const isRemoving = removing[item.id];
+            const isAdding = adding[product.id];
 
             return (
               <div
                 key={item.id}
-                className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition"
+                className={`bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition ${
+                  isRemoving ? 'opacity-50 pointer-events-none' : ''
+                }`}
               >
                 <div className="relative pt-[75%]">
                   <Image
@@ -124,32 +171,37 @@ export default function WishlistPage() {
                   />
                   <button
                     onClick={() => handleRemove(item.id, product.name)}
-                    className="absolute top-2 right-2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition"
+                    disabled={isRemoving}
+                    className="absolute top-2 right-2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition disabled:opacity-50"
                   >
-                    <Trash2 className="w-4 h-4 text-red-500" />
+                    {isRemoving ? (
+                      <Loader2 className="w-4 h-4 text-red-500 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    )}
                   </button>
                 </div>
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">
                     {product.name}
                   </h3>
-                  <p className="text-sm text-gray-500 mb-2">In stock</p>
+                  <p className="text-sm text-green-600 font-medium mb-2">In stock</p>
                   <p className="text-lg font-bold text-[#4EA674] mb-3">
                     ₦{price.toLocaleString()}
                   </p>
                   <div className="flex gap-2">
                     <Link
-                      href={`/products/${product.slug || product.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      href={`/products/${product.slug || product.id}`}
                       className="flex-1 border border-[#4EA674] text-[#4EA674] py-2 rounded-full text-sm font-medium hover:bg-[#4EA674]/10 transition text-center"
                     >
                       View
                     </Link>
                     <button
                       onClick={() => handleAddToCart(product.id, price)}
-                      disabled={adding[product.id]}
+                      disabled={isAdding}
                       className="flex-1 bg-[#4EA674] text-white py-2 rounded-full text-sm font-medium hover:bg-[#3D8B59] transition disabled:opacity-60"
                     >
-                      {adding[product.id] ? 'Adding...' : 'Add to Cart'}
+                      {isAdding ? 'Adding...' : 'Add to Cart'}
                     </button>
                   </div>
                 </div>
@@ -158,6 +210,22 @@ export default function WishlistPage() {
           })}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slideIn {
+          animation: slideIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

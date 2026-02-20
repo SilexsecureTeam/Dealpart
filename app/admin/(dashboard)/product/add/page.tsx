@@ -3,6 +3,7 @@
 import { useState, useEffect, type ChangeEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Search,
   Bell,
@@ -15,8 +16,9 @@ import {
   X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCreateProduct, type CreateProductPayload } from "@/hooks/useProducts";
-import { api } from "@/lib/apiClient";
+import { api } from "@/lib/api";
 
 type Category = {
   id: number;
@@ -29,13 +31,22 @@ type Category = {
   tag_id: number | null;
 };
 
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  const raw = String(pathOrUrl).trim();
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const filename = raw.split('/').pop() || raw;
+  return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
+};
+
 export default function AddProductPage() {
   const router = useRouter();
   const [currency, setCurrency] = useState("US");
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Form states
   const [productName, setProductName] = useState('Lithium LiFePO4 Battery 12 / 100Ah');
   const [description, setDescription] = useState(
     'Upgrade your energy storage with this high-performance 12V 100Ah Lithium Iron Phosphate (LiFePO4) battery. Designed as a superior drop-in replacement for traditional lead-acid batteries, it delivers consistent power, significantly longer lifespan, and cutting-edge safety features in a package that weighs half as much.'
@@ -50,37 +61,64 @@ export default function AddProductPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Categories
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
   const [catLoading, setCatLoading] = useState(false);
+  const [catError, setCatError] = useState<string | null>(null);
 
-  // Colors
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const colorOptions = ['#90EE90', '#FFB6C1', '#D3D3D3', '#000000', '#FFD700'];
 
-  // Images
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
 
-  // Form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pageMsg, setPageMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Mobile search
   const [showSearch, setShowSearch] = useState(false);
 
-  // ✅ React Query mutation
+  const avatarUrl = user?.avatar_url || user?.avatar 
+    ? resolveAvatar(user.avatar_url || user.avatar) 
+    : '/man.png';
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
+
   const createProduct = useCreateProduct();
 
-  // Fetch categories
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      router.push('/login');
+    }
+  }, [router]);
+
   async function fetchCategories() {
     setCatLoading(true);
+    setCatError(null);
+    
     try {
-      const json = await api.categories.list();
-      const list = Array.isArray(json) ? json : (json?.data as Category[]) || [];
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const json = await api.get('/categories');
+      const data = json.data || json;
+      const list = Array.isArray(data) ? data : (data?.data as Category[]) || [];
       setCategories(list);
+    } catch (error: any) {
+      setCatError(error?.message || 'Failed to load categories');
+      
+      if (error?.message?.includes('401') || error?.status === 401) {
+        localStorage.removeItem('adminToken');
+        router.push('/login');
+      }
     } finally {
       setCatLoading(false);
     }
@@ -91,7 +129,6 @@ export default function AddProductPage() {
     fetchCategories();
   }, []);
 
-  // Image upload handler
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
 
@@ -127,7 +164,6 @@ export default function AddProductPage() {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Color selection toggle
   const toggleColor = (color: string) => {
     setSelectedColors(prev =>
       prev.includes(color)
@@ -136,7 +172,6 @@ export default function AddProductPage() {
     );
   };
 
-  // Form validation
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -177,15 +212,20 @@ export default function AddProductPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ Handle publish with React Query mutation
   const handlePublish = async () => {
     setPageMsg(null);
+    
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    
     if (!validateForm()) {
       setPageMsg({ type: "error", text: "Please fix the errors in the form." });
       return;
     }
 
-    // Build payload
     const payload: CreateProductPayload = {
       name: productName.trim(),
       description: description.trim(),
@@ -195,28 +235,36 @@ export default function AddProductPage() {
       stock_quantity: unlimitedStock ? undefined : stockQuantity,
       images: imageFiles,
       colours: selectedColors,
-      customize: true, // Set to true if you add customization UI later
+      customize: true,
     };
 
     try {
       await createProduct.mutateAsync(payload);
+      
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      
       setPageMsg({ type: "success", text: "Product created successfully!" });
       
-      // Redirect to product list after 1.5 seconds
       setTimeout(() => {
         router.push('/admin/product/list');
       }, 1500);
     } catch (e: any) {
-      setPageMsg({ 
-        type: "error", 
-        text: e?.message || "Failed to create product. Please try again." 
-      });
+      console.error('Publish error:', e);
+      
+      if (e?.response?.status === 401 || e?.message?.includes('401')) {
+        localStorage.removeItem('adminToken');
+        router.push('/login');
+      } else {
+        setPageMsg({ 
+          type: "error", 
+          text: e?.message || "Failed to create product. Please try again." 
+        });
+      }
     }
   };
 
   const handleSaveDraft = () => {
     setPageMsg({ type: "success", text: "Draft saved!" });
-    // In a real app, you'd save to localStorage or send a draft API call
   };
 
   if (!mounted) {
@@ -225,7 +273,6 @@ export default function AddProductPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header – EXACT original */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Add Product</h1>
 
@@ -272,7 +319,12 @@ export default function AddProductPage() {
           </button>
 
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
+            <img
+              src={avatarUrl}
+              alt="Admin"
+              className="object-cover w-full h-full"
+              onError={handleImageError}
+            />
           </div>
         </div>
       </header>
@@ -292,7 +344,6 @@ export default function AddProductPage() {
       )}
 
       <main className="p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
-        {/* Page message */}
         {pageMsg && (
           <div
             className={`mb-6 rounded-xl px-4 py-3 text-sm border flex justify-between items-center ${
@@ -308,7 +359,12 @@ export default function AddProductPage() {
           </div>
         )}
 
-        {/* Top Actions */}
+        {catError && (
+          <div className="mb-6 rounded-xl px-4 py-3 text-sm border bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300">
+            Error loading categories: {catError}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Add New Product</h2>
           <div className="flex flex-wrap items-center gap-3">
@@ -340,9 +396,7 @@ export default function AddProductPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left - Main Form */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Basic Details */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Basic Details</h3>
               <div className="space-y-6">
@@ -373,7 +427,6 @@ export default function AddProductPage() {
               </div>
             </div>
 
-            {/* Pricing */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Pricing</h3>
               <div className="space-y-6">
@@ -450,7 +503,6 @@ export default function AddProductPage() {
               </div>
             </div>
 
-            {/* Expiration */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Expiration</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -483,7 +535,6 @@ export default function AddProductPage() {
               </div>
             </div>
 
-            {/* Inventory */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Inventory</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -543,9 +594,7 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* Right Sidebar */}
           <div className="space-y-8">
-            {/* Image Upload */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Upload Product Image</h3>
               <div className="space-y-6">
@@ -591,29 +640,31 @@ export default function AddProductPage() {
               </div>
             </div>
 
-            {/* Categories */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <h3 className="text-xl font-bold mb-6">Categories</h3>
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Categories</label>
-                  <select
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg"
-                    disabled={catLoading}
-                  >
-                    <option value="">
-                      {catLoading ? "Loading categories..." : "Select your category"}
-                    </option>
-                    {categories
-                      .filter((c) => c.is_active === 1)
-                      .map((c) => (
-                        <option key={c.id} value={String(c.id)}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </select>
+                  {catLoading ? (
+                    <div className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-500">
+                      Loading categories...
+                    </div>
+                  ) : (
+                    <select
+                      value={categoryId}
+                      onChange={(e) => setCategoryId(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select your category</option>
+                      {categories
+                        .filter((c) => c.is_active === 1)
+                        .map((c) => (
+                          <option key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Tag</label>
@@ -652,7 +703,6 @@ export default function AddProductPage() {
           </div>
         </div>
 
-        {/* Bottom Actions */}
         <div className="flex justify-end gap-4 mt-12">
           <button
             onClick={handleSaveDraft}

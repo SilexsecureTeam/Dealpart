@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   MoreVertical,
   Search,
@@ -22,7 +23,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// ---------- React Query Hooks ----------
 import {
   useDashboardSummary,
   useDashboardWeeklyStats,
@@ -36,7 +36,6 @@ import {
 import { useCategories } from '@/hooks/useCategories';
 import { Product, Transaction } from '@/types';
 
-// ---------- Types ----------
 type AdminUser = {
   id: number;
   name: string | null;
@@ -47,14 +46,70 @@ type AdminUser = {
   expires_at: string | null;
 };
 
-// ---------- Helpers ----------
 const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
 const formatCompact = (num: number) => {
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toString();
 };
 
-// ---------- Loading Skeletons ----------
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  
+  const raw = String(pathOrUrl).trim();
+  
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  if (raw.startsWith('/')) return raw;
+  
+  const filename = raw.split('/').pop() || raw;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://bezalelsolar.com';
+  return `${baseUrl}/storage/avatars/${filename}`;
+};
+
+const resolveProductImage = (imagePath: string | null | undefined): string => {
+  if (!imagePath) return '/solarpanel.png';
+  
+  const raw = String(imagePath).trim();
+  
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  if (raw.startsWith('/')) return raw;
+  
+  const filename = raw.split('/').pop() || raw;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://bezalelsolar.com';
+  return `${baseUrl}/storage/products/${filename}`;
+};
+
+const SafeImage = ({ src, alt, width, height, className, fallbackSrc = '/solarpanel.png' }: {
+  src: string | null | undefined;
+  alt: string;
+  width: number;
+  height: number;
+  className?: string;
+  fallbackSrc?: string;
+}) => {
+  const [imgSrc, setImgSrc] = useState<string>(() => {
+    if (!src) return fallbackSrc;
+    return resolveProductImage(src);
+  });
+
+  useEffect(() => {
+    setImgSrc(resolveProductImage(src));
+  }, [src]);
+
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      unoptimized
+      onError={() => setImgSrc(fallbackSrc)}
+    />
+  );
+};
+
 const SkeletonCard = () => (
   <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm animate-pulse">
     <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4" />
@@ -87,18 +142,15 @@ const SkeletonBestSellingRow = () => (
   </tr>
 );
 
-// ---------- Main Component ----------
 export default function AdminDashboard() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
-  const [admin, setAdmin] = useState<AdminUser | null>(null);
 
-  // ---------- Filters ----------
   const [transactionFilter, setTransactionFilter] = useState<string>('All');
   const [bestSellingFilter, setBestSellingFilter] = useState<string>('All');
 
-  // ---------- React Query ----------
   const { data: summary, isLoading: loadingSummary } = useDashboardSummary();
   const { data: weeklyStats, isLoading: loadingWeeklyStats } = useDashboardWeeklyStats();
   const { data: weeklySales, isLoading: loadingChart } = useDashboardWeeklySales();
@@ -109,7 +161,6 @@ export default function AdminDashboard() {
   const { data: liveUsers, isLoading: loadingLiveUsers } = useDashboardLiveUsers();
   const { data: countrySales = [], isLoading: loadingCountrySales } = useDashboardCountrySales();
 
-  // ---------- Derived Data (with safe fallbacks) ----------
   const bestSelling = bestSellingData?.data || [];
   const topProducts = topProductsData?.data || [];
 
@@ -125,7 +176,18 @@ export default function AdminDashboard() {
         : bestSellingFilter === 'Stock out'
   );
 
-  // ---------- Auth Check ----------
+  const avatarUrl = useMemo(() => {
+    if (!user) return '/man.png';
+    const avatarPath = (user as any).avatar_url || user.avatar;
+    return resolveAvatar(avatarPath);
+  }, [user]);
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
+
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('adminToken');
@@ -133,17 +195,8 @@ export default function AdminDashboard() {
       router.push('/admin/login');
       return;
     }
-    const user = localStorage.getItem('adminUser');
-    if (user) {
-      try {
-        setAdmin(JSON.parse(user));
-      } catch {
-        // fallback
-      }
-    }
   }, [router]);
 
-  // ---------- Handlers ----------
   const handleDetailsClick = (path: string) => router.push(`/admin/${path}`);
   const handleAddCategory = () => router.push('/admin/categories');
   const handleAddToCart = (productId: number) => alert(`Add product ${productId} to cart (coming soon)`);
@@ -151,7 +204,6 @@ export default function AdminDashboard() {
   const handleSeeMoreProducts = () => router.push('/admin/product/add');
   const handleViewInsight = () => router.push('/admin/analytics');
 
-  // ---------- Render ----------
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
@@ -162,7 +214,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* ---------- Header ---------- */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
 
@@ -204,29 +255,27 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3">
             <div className="hidden md:block text-right">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                {admin?.name || 'Admin User'}
+                {user?.name || 'Admin User'}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {admin?.email || 'admin@example.com'}
+                {user?.email || 'admin@example.com'}
               </p>
             </div>
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-              <Image
-                src={admin?.avatar || '/man.png'}
+              <img
+                key={avatarUrl}
+                src={avatarUrl}
                 alt="Admin"
-                width={40}
-                height={40}
                 className="object-cover w-full h-full"
-                unoptimized
+                onError={handleImageError}
               />
             </div>
           </div>
         </div>
       </header>
 
-      {/* ---------- Main content ---------- */}
       <main className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 bg-gray-50 dark:bg-gray-950">
-        {/* Top Stats Cards */}
+        {/* Rest of your dashboard content remains exactly the same */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {loadingSummary ? (
             <>
@@ -236,7 +285,6 @@ export default function AdminDashboard() {
             </>
           ) : (
             <>
-              {/* Total Sales */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -268,7 +316,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {/* Total Orders */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -300,7 +347,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {/* Pending & Canceled */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -340,9 +386,7 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Weekly Report + Live Users */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Weekly Report */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
               <h3 className="text-xl font-bold">Report for this week</h3>
@@ -449,7 +493,6 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Live Users + Sales by Country */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
             {loadingLiveUsers ? (
               <div className="animate-pulse space-y-6">
@@ -507,6 +550,9 @@ export default function AdminDashboard() {
                         src={`https://flagcdn.com/w80/${c.flag}.png`}
                         alt={c.country}
                         className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700"
+                        onError={(e) => {
+                          e.currentTarget.src = '/solarpanel.png';
+                        }}
                       />
                       <div className="flex-1">
                         <div className="flex justify-between text-sm mb-1.5">
@@ -537,11 +583,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Bottom Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Transaction + Best Selling */}
           <div className="lg:col-span-8 flex flex-col gap-8">
-            {/* Transaction */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-8">
                 <h3 className="text-xl font-bold">Transaction</h3>
@@ -628,7 +671,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Best Selling Product */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">Best selling product</h3>
@@ -671,16 +713,15 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ) : (
-                      filteredBestSelling.map((p) => (
+                      filteredBestSelling.map((p: Product) => (
                         <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                           <td className="py-6 flex items-center gap-4">
-                            <Image
-                              src={p.images?.[0] || '/solarpanel.png'}
+                            <SafeImage
+                              src={p.images?.[0]}
                               alt={p.name}
                               width={48}
                               height={48}
                               className="rounded-lg object-cover flex-shrink-0"
-                              unoptimized
                             />
                             <span className="font-medium">{p.name}</span>
                           </td>
@@ -722,9 +763,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Right column */}
           <div className="lg:col-span-4 flex flex-col gap-8">
-            {/* Top Products */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">Top Products</h3>
@@ -749,15 +788,14 @@ export default function AdminDashboard() {
                     </div>
                   ))
                 ) : (
-                  (topProducts || []).slice(0, 4).map((p) => (
+                  (topProducts || []).slice(0, 4).map((p: Product) => (
                     <div key={p.id} className="flex items-center gap-4">
-                      <Image
-                        src={p.images?.[0] || '/solarpanel.png'}
+                      <SafeImage
+                        src={p.images?.[0]}
                         alt={p.name}
                         width={64}
                         height={64}
                         className="rounded-lg object-cover flex-shrink-0"
-                        unoptimized
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{p.name}</p>
@@ -774,7 +812,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Add New Category */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">Add New Category</h3>
@@ -810,13 +847,12 @@ export default function AdminDashboard() {
                         onClick={() => router.push(`/admin/categories/${cat.id}`)}
                       >
                         <div className="flex items-center gap-4">
-                          <Image
-                            src={cat.image || '/solarpanel.png'}
+                          <SafeImage
+                            src={cat.image}
                             alt={cat.name}
                             width={48}
                             height={48}
                             className="rounded-lg object-cover"
-                            unoptimized
                           />
                           <span className="font-medium">{cat.name}</span>
                         </div>
@@ -850,19 +886,18 @@ export default function AdminDashboard() {
                       </div>
                     ))
                   ) : (
-                    (topProducts || []).slice(0, 3).map((p) => (
+                    (topProducts || []).slice(0, 3).map((p: Product) => (
                       <div
                         key={p.id}
                         className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
                         <div className="flex items-center gap-4">
-                          <Image
-                            src={p.images?.[0] || '/solarpanel.png'}
+                          <SafeImage
+                            src={p.images?.[0]}
                             alt={p.name}
                             width={48}
                             height={48}
                             className="rounded-lg object-cover"
-                            unoptimized
                           />
                           <div>
                             <p className="font-medium">{p.name}</p>

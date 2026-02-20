@@ -24,9 +24,9 @@ export const AdminEndpoints = {
   productDetail: (id: number | string) => `${API_BASE}/api/products/${id}`,
   
   // Orders
-  orders: `${API_BASE}/api/orders`,
-  orderDetail: (id: number | string) => `${API_BASE}/api/orders/${id}`,
-  orderStats: `${API_BASE}/api/orders/stats`,
+  orders: `${API_BASE}/api/admin/orders`,
+  orderDetail: (id: number | string) => `${API_BASE}/api/admin/orders/${id}`,
+  orderStats: `${API_BASE}/api/admin/orders/stats`,
   
   // Dashboard
   dashboardSummary: `${API_BASE}/api/admin/dashboard/summary`,
@@ -65,6 +65,8 @@ export const CustomerEndpoints = {
   verifyCode: `${API_BASE}/api/verify-code`,
   profile: `${API_BASE}/api/profile`,
   updateProfile: `${API_BASE}/api/profile`,
+brands: `${API_BASE}/api/brands`,
+brandDetail: (slug: string) => `${API_BASE}/api/brands/${slug}`,
   products: `${API_BASE}/api/products`,
   productDetail: (id: number | string) => `${API_BASE}/api/products/${id}`,
   cart: `${API_BASE}/api/cart`,

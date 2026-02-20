@@ -22,8 +22,33 @@ import {
   useUpdateProfile, 
   useUploadAvatar, 
   useUpdatePassword,
-  type ProfileData,
 } from '@/hooks/useProfile';
+
+// Helper to resolve avatar URL (same as in sidebar)
+const resolveAvatar = (pathOrUrl: string | null | undefined): string | null => {
+  if (!pathOrUrl || String(pathOrUrl).trim() === '') return null;
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // The base URL for storage (remove /api from the API URL)
+  const base = (process.env.NEXT_PUBLIC_API_URL || 'https://admin.bezalelsolar.com/api').replace('/api', '');
+  
+  // If it starts with 'avatars/' 
+  if (raw.startsWith('avatars/')) {
+    return `${base}/storage/${raw}`;
+  }
+  
+  // If it's just a filename (no slashes)
+  if (!raw.includes('/')) {
+    return `${base}/storage/avatars/${raw}`;
+  }
+  
+  // For any other path
+  return `${base}/storage/${raw}`;
+};
 
 export default function AdminRolePage() {
   const { theme, setTheme } = useTheme();
@@ -62,7 +87,7 @@ export default function AdminRolePage() {
     dob: '',
     location: '',
     bio: '',
-    creditCard: '843-4359-4444', // static for now
+    creditCard: '843-4359-4444',
   });
 
   // ---------- Password form ----------
@@ -78,70 +103,20 @@ export default function AdminRolePage() {
     return { first: parts[0] || '', last: parts.slice(1).join(' ') || '' };
   };
 
-  // ---------- Helper: resolve absolute avatar URL ----------
-  const resolveAvatar = (pathOrUrl: string | null | undefined): string | null => {
-    if (!pathOrUrl || String(pathOrUrl).trim() === '') return null;
-    const raw = String(pathOrUrl).trim();
-    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-    let clean = raw.startsWith('/') ? raw.slice(1) : raw;
-    if (clean.startsWith('avatars/')) clean = `storage/${clean}`;
-    const base = process.env.NEXT_PUBLIC_API_URL || 'https://admin.bezalelsolar.com';
-    return `${base}/${clean}`;
-  };
-
-  // ---------- Fetch protected image with Bearer token ----------
-  const fetchProtectedImage = async (imageUrl: string): Promise<string | null> => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) return null;
-
-    try {
-      const res = await fetch(imageUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
-      const blob = await res.blob();
-      return URL.createObjectURL(blob);
-    } catch (error) {
-      console.error('Avatar fetch error:', error);
-      return null;
-    }
+  // ---------- Get avatar URL with cache busting ----------
+  const getAvatarWithCacheBust = (url: string | null): string => {
+    if (!url) return '/man.png';
+    return `${url}?t=${Date.now()}`;
   };
 
   // ---------- Load avatar when profile changes ----------
   useEffect(() => {
-    const loadAvatar = async () => {
-      if (!profile) {
-        setDisplayUrl('/man.png');
-        return;
-      }
-
+    if (profile) {
       const fromApi = profile.avatar_url || profile.avatar || null;
       const real = resolveAvatar(fromApi);
-      if (!real) {
-        setDisplayUrl('/man.png');
-        return;
-      }
-
-      try {
-        const blobUrl = await fetchProtectedImage(real);
-        // Clean up old blob URL
-        if (displayUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(displayUrl);
-        }
-        setDisplayUrl(blobUrl || '/man.png');
-        localStorage.setItem('adminAvatarSrc', real);
-      } catch (error) {
-        console.error('Avatar load failed:', error);
-        setDisplayUrl('/man.png');
-      }
-    };
-
-    loadAvatar();
-  }, [profile]);
-
-  // ---------- Sync profile data to form ----------
-  useEffect(() => {
-    if (profile) {
+      setDisplayUrl(getAvatarWithCacheBust(real));
+      
+      // Update form data
       const fullName = profile.name || '';
       const { first, last } = splitName(fullName);
       setFormData({
@@ -152,10 +127,17 @@ export default function AdminRolePage() {
         dob: profile.dob ?? '',
         location: profile.location ?? '',
         bio: profile.bio ?? '',
-        creditCard: formData.creditCard, // keep existing
+        creditCard: formData.creditCard,
       });
     }
   }, [profile]);
+
+  // ---------- Image error handler ----------
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
 
   // ---------- Copy to clipboard ----------
   const copyToClipboard = async (text: string) => {
@@ -194,50 +176,34 @@ export default function AdminRolePage() {
   const handleUploadAvatar = async (file: File) => {
     setProfileMsg(null);
     
-    // Preview immediately
+    // Show preview immediately
     const preview = URL.createObjectURL(file);
     setDisplayUrl(preview);
 
     try {
-      const response = await uploadAvatar.mutateAsync(file);
+      await uploadAvatar.mutateAsync(file);
       
-      // Extract new avatar URL from response
-      const newAvatarUrl = 
-        response?.avatar_url ||
-        response?.data?.avatar_url ||
-        response?.data?.avatar ||
-        response?.user?.avatar_url ||
-        response?.user?.avatar ||
-        null;
-
-      if (newAvatarUrl) {
-        const real = resolveAvatar(String(newAvatarUrl));
-        if (real) {
-          localStorage.setItem('adminAvatarSrc', real);
-          const blobUrl = await fetchProtectedImage(real);
-          setDisplayUrl(blobUrl || '/man.png');
-        }
-      } else {
-        // No URL in response, refetch profile
-        await refetchProfile();
-      }
-
+      // Clean up preview
+      URL.revokeObjectURL(preview);
+      
+      // Refetch profile to get updated data
+      await refetchProfile();
+      
       setProfileMsg({ type: 'success', text: 'Avatar uploaded successfully.' });
     } catch (e: any) {
+      // Clean up preview on error
+      URL.revokeObjectURL(preview);
+      
       setProfileMsg({
         type: 'error',
         text: e?.message || 'Failed to upload avatar.',
       });
-      // Revert to previous avatar on error
+      
+      // Revert to current avatar on error
       if (profile) {
         const fromApi = profile.avatar_url || profile.avatar || null;
         const real = resolveAvatar(fromApi);
-        if (real) {
-          const blobUrl = await fetchProtectedImage(real);
-          setDisplayUrl(blobUrl || '/man.png');
-        } else {
-          setDisplayUrl('/man.png');
-        }
+        setDisplayUrl(getAvatarWithCacheBust(real));
       } else {
         setDisplayUrl('/man.png');
       }
@@ -253,29 +219,31 @@ export default function AdminRolePage() {
   };
 
   // ---------- Update password ----------
-  const handleUpdatePassword = async () => {
-    setPwdMsg(null);
 
-    if (!pwd.current_password || !pwd.password || !pwd.password_confirmation) {
-      setPwdMsg({ type: 'error', text: 'Please fill all password fields.' });
-      return;
-    }
-    if (pwd.password !== pwd.password_confirmation) {
-      setPwdMsg({ type: 'error', text: 'New password and confirmation do not match.' });
-      return;
-    }
+const handleUpdatePassword = async () => {
+  setPwdMsg(null);
 
-    try {
-      const response = await updatePassword.mutateAsync(pwd);
-      setPwdMsg({ type: 'success', text: response?.message || 'Password updated successfully.' });
-      setPwd({ current_password: '', password: '', password_confirmation: '' });
-    } catch (e: any) {
-      setPwdMsg({
-        type: 'error',
-        text: e?.message || 'Failed to update password.',
-      });
-    }
-  };
+  if (!pwd.current_password || !pwd.password || !pwd.password_confirmation) {
+    setPwdMsg({ type: 'error', text: 'Please fill all password fields.' });
+    return;
+  }
+  if (pwd.password !== pwd.password_confirmation) {
+    setPwdMsg({ type: 'error', text: 'New password and confirmation do not match.' });
+    return;
+  }
+
+  try {
+    const response = await updatePassword.mutateAsync(pwd);
+    const message = response?.data?.message || response?.message || 'Password updated successfully.';
+    setPwdMsg({ type: 'success', text: message });
+    setPwd({ current_password: '', password: '', password_confirmation: '' });
+  } catch (e: any) {
+    setPwdMsg({
+      type: 'error',
+      text: e?.response?.data?.message || e?.message || 'Failed to update password.',
+    });
+  }
+};
 
   // ---------- Mount ----------
   useEffect(() => {
@@ -284,21 +252,14 @@ export default function AdminRolePage() {
 
   const fullName = `${formData.firstName} ${formData.lastName}`.trim();
 
-  // ---------- Image error handler ----------
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    if (img.src === '/man.png') return;
-    img.src = '/man.png';
-  };
-
   if (!mounted) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header (keep your existing header) */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm gap-3">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
           Admin role
         </h1>
@@ -605,7 +566,7 @@ export default function AdminRolePage() {
                   className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2 text-gray-800 dark:text-gray-100"
                 >
                   <Edit2 className="w-4 h-4" />
-                  Refresh
+                  Edit
                 </button>
               </div>
 

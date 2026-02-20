@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/contexts/AuthContext'; // Add this
 import {
   AreaChart,
   Area,
@@ -52,6 +53,22 @@ const formatCurrency = (amount: number | undefined | null) => {
   return `$${amount.toLocaleString()}`;
 };
 
+// Helper to resolve avatar URL
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // Extract just the filename
+  const filename = raw.split('/').pop() || raw;
+  
+  // Return the correct storage path
+  return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
+};
+
 // ---------- Loading Skeletons ----------
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
@@ -85,6 +102,7 @@ const MobileCardSkeleton = () => (
 // ---------- Main Component ----------
 export default function CustomersPage() {
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth(); // Add this
   const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
@@ -92,6 +110,18 @@ export default function CustomersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const itemsPerPage = 10;
+
+  // Get avatar URL
+  const avatarUrl = user?.avatar_url || user?.avatar 
+    ? resolveAvatar(user.avatar_url || user.avatar) 
+    : '/man.png';
+
+  // Handle image error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
 
   // ---------- Debounce Search ----------
   useEffect(() => {
@@ -213,8 +243,14 @@ export default function CustomersPage() {
             />
           </button>
 
+          {/* Dynamic Avatar */}
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
+            <img
+              src={avatarUrl}
+              alt="Admin"
+              className="object-cover w-full h-full"
+              onError={handleImageError}
+            />
           </div>
         </div>
       </header>

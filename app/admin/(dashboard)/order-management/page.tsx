@@ -19,19 +19,22 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-
-// ---------- React Query Hooks ----------
-import { useOrderStats } from '@/hooks/useOrderStats';
-import { useOrders } from '@/hooks/useOrders';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrderStats, useOrders } from '@/hooks/useOrders';
 import { OrderListItem, OrderStats } from '@/types';
 
-// ---------- Types ----------
 type FilterType = 'all' | 'completed' | 'pending' | 'canceled';
 
-// ---------- Helpers ----------
 const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
 
-// ---------- Loading Skeletons ----------
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  const raw = String(pathOrUrl).trim();
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const filename = raw.split('/').pop() || raw;
+  return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
+};
+
 const StatCardSkeleton = () => (
   <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm animate-pulse">
     <div className="flex justify-between items-start mb-2 sm:mb-4">
@@ -83,13 +86,11 @@ const MobileCardSkeleton = () => (
   </div>
 );
 
-// ---------- Main Page ----------
 export default function OrderManagementPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
-
-  // ---------- Local State ----------
   const [filter, setFilter] = useState<FilterType>('all');
   const [page, setPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
@@ -99,37 +100,41 @@ export default function OrderManagementPage() {
 
   const itemsPerPage = 10;
 
-  // ---------- Debounce Search ----------
+  const avatarUrl = user?.avatar_url || user?.avatar 
+    ? resolveAvatar(user.avatar_url || user.avatar) 
+    : '/man.png';
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // ---------- Reset page when filter or search changes ----------
   useEffect(() => {
     setPage(1);
   }, [filter, debouncedSearch]);
 
-  // ---------- React Query ----------
   const {
     data: stats,
     isLoading: statsLoading,
     error: statsError,
-    refetch: refetchStats,
   } = useOrderStats();
 
   const {
     data: ordersData,
     isLoading: ordersLoading,
     error: ordersError,
-    refetch: refetchOrders,
   } = useOrders(page, itemsPerPage, filter, debouncedSearch);
 
-const orders = (ordersData?.orders || []) as OrderListItem[];
+  const orders = (ordersData?.orders || []) as OrderListItem[];
   const total = ordersData?.total || 0;
   const totalPages = Math.ceil(total / itemsPerPage);
 
-  // ---------- Error Handling ----------
   useEffect(() => {
     if (statsError) {
       setMessage({ type: 'error', text: 'Failed to load order statistics' });
@@ -142,7 +147,6 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
     }
   }, [ordersError]);
 
-  // ---------- Auto-dismiss Toast ----------
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(null), 5000);
@@ -150,7 +154,6 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
     }
   }, [message]);
 
-  // ---------- Mount ----------
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -165,11 +168,10 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Order Management</h1>
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 sm:px-8 lg:px-10 py-6 flex items-center justify-between shadow-sm">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Order Management</h1>
 
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-4 sm:gap-6">
           <button
             className="p-2 md:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
             onClick={() => setShowSearch(!showSearch)}
@@ -182,10 +184,10 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search orders..."
+              placeholder="Search data, users, or reports"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 pr-6 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm w-64 lg:w-96 focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
+              className="pl-12 pr-6 py-3 bg-gray-100 dark:bg-gray-700 rounded-full text-sm w-72 lg:w-96 focus:outline-none focus:ring-2 focus:ring-[#4EA674]/30"
             />
           </div>
 
@@ -196,7 +198,7 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
 
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="relative p-3 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             aria-label="Toggle dark mode"
           >
             <Sun
@@ -211,14 +213,19 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             />
           </button>
 
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
+            <img
+              src={avatarUrl}
+              alt="Admin"
+              className="object-cover w-full h-full"
+              onError={handleImageError}
+            />
           </div>
         </div>
       </header>
 
       {showSearch && (
-        <div className="md:hidden px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="md:hidden px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -233,11 +240,10 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
         </div>
       )}
 
-      <main className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 bg-gray-50 dark:bg-gray-950">
-        {/* Toast Message */}
+      <main className="px-6 sm:px-8 lg:px-10 py-8 lg:py-10 bg-gray-50 dark:bg-gray-950">
         {message && (
           <div
-            className={`mb-6 rounded-xl px-4 py-3 text-sm border flex justify-between items-center ${
+            className={`mb-8 rounded-xl px-5 py-4 text-base border flex justify-between items-center ${
               message.type === 'success'
                 ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300'
                 : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
@@ -250,25 +256,23 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
           </div>
         )}
 
-        {/* Order List title + actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Order List</h2>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Order List</h2>
+          <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/admin/order/add')}
-              className="px-5 py-2.5 bg-[#4EA674] text-white rounded-full text-sm font-medium flex items-center gap-2 hover:bg-[#3D8B59] transition-colors"
+              className="px-6 py-3 bg-[#4EA674] text-white rounded-full text-sm font-medium flex items-center gap-2 hover:bg-[#3D8B59] transition-colors"
             >
               + Add Order
             </button>
-            <button className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+            <button className="px-5 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
               More
               <MoreVertical className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8 mb-10">
           {statsLoading ? (
             <>
               <StatCardSkeleton />
@@ -278,77 +282,75 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             </>
           ) : (
             <>
-              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
-                <div className="flex justify-between items-start mb-2 sm:mb-4">
-                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">Total Orders</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Total Orders</h3>
                   <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                 </div>
-                <div className="flex items-end gap-2">
-                  <p className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                <div className="flex items-end gap-3">
+                  <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
                     {stats?.totalOrders?.toLocaleString() ?? '1,240'}
                   </p>
-                  <p className="text-sm sm:text-lg font-bold text-[#4EA674]">
+                  <p className="text-base sm:text-lg font-bold text-[#4EA674]">
                     {stats?.totalOrdersChange ?? '↑ 14.4%'}
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Last 7 days</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">Last 7 days</p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
-                <div className="flex justify-between items-start mb-2 sm:mb-4">
-                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">New Orders</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">New Orders</h3>
                   <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                 </div>
-                <div className="flex items-end gap-2">
-                  <p className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                <div className="flex items-end gap-3">
+                  <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
                     {stats?.newOrders?.toLocaleString() ?? '240'}
                   </p>
-                  <p className="text-sm sm:text-lg font-bold text-[#4EA674]">
+                  <p className="text-base sm:text-lg font-bold text-[#4EA674]">
                     {stats?.newOrdersChange ?? '↑ 20%'}
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Last 7 days</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">Last 7 days</p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
-                <div className="flex justify-between items-start mb-2 sm:mb-4">
-                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">Completed</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Completed</h3>
                   <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                 </div>
-                <div className="flex items-end gap-2">
-                  <p className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                <div className="flex items-end gap-3">
+                  <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
                     {stats?.completedOrders?.toLocaleString() ?? '960'}
                   </p>
-                  <p className="text-sm sm:text-lg font-bold text-[#4EA674]">
+                  <p className="text-base sm:text-lg font-bold text-[#4EA674]">
                     {stats?.completedPercent ?? '85%'}
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Last 7 days</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">Last 7 days</p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
-                <div className="flex justify-between items-start mb-2 sm:mb-4">
-                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">Canceled</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Canceled</h3>
                   <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                 </div>
-                <div className="flex items-end gap-2">
-                  <p className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                <div className="flex items-end gap-3">
+                  <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
                     {stats?.canceledOrders?.toLocaleString() ?? '87'}
                   </p>
-                  <p className="text-sm sm:text-lg font-bold text-[#F43443]">
+                  <p className="text-base sm:text-lg font-bold text-[#F43443]">
                     {stats?.canceledChange ?? '↓ 5%'}
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Last 7 days</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">Last 7 days</p>
               </div>
             </>
           )}
         </div>
 
-        {/* Main content card */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
-          {/* Top bar - Search + Icons */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div className="relative w-full sm:max-w-md lg:max-w-lg flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
@@ -376,13 +378,12 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap gap-2 sm:gap-3 mb-6">
+          <div className="flex flex-wrap gap-3 mb-8">
             {(['all', 'completed', 'pending', 'canceled'] as FilterType[]).map((type) => (
               <button
                 key={type}
                 onClick={() => setFilter(type)}
-                className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-4 sm:px-5 py-2 rounded-full text-sm sm:text-base font-medium transition-colors ${
                   filter === type
                     ? 'bg-[#C1E6BA] text-[#4EA674]'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -393,7 +394,6 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             ))}
           </div>
 
-          {/* Desktop Table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-[#EAF8E7] dark:bg-gray-800/50">
@@ -473,7 +473,6 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             </table>
           </div>
 
-          {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
             {ordersLoading ? (
               Array.from({ length: 3 }).map((_, i) => <MobileCardSkeleton key={i} />)
@@ -540,18 +539,17 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
             )}
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 sm:mt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 sm:mt-10">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1 || ordersLoading}
-                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+                className="w-full sm:w-auto px-8 py-3 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
               >
                 <ChevronLeft className="w-4 h-4" /> Previous
               </button>
 
-              <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum = i + 1;
                   if (totalPages > 5) {
@@ -568,7 +566,7 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
                       key={pageNum}
                       onClick={() => setPage(pageNum)}
                       disabled={ordersLoading}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium min-w-[36px] ${
+                      className={`px-4 py-2 rounded-lg text-sm font-medium min-w-[40px] ${
                         page === pageNum
                           ? 'bg-[#C1E6BA] text-[#4EA674]'
                           : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -583,7 +581,7 @@ const orders = (ordersData?.orders || []) as OrderListItem[];
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages || ordersLoading}
-                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+                className="w-full sm:w-auto px-8 py-3 border border-gray-300 dark:border-gray-600 rounded-full text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
               >
                 Next <ChevronRight className="w-4 h-4" />
               </button>

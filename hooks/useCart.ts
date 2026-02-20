@@ -1,6 +1,6 @@
 // hooks/useCart.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { customerApi } from '@/lib/customerApiClient';
+import { customerApi } from '@/lib/customerApiClient'; // This stays as is
 import { getCart, calcCartSummary, emitCartUpdated } from '@/lib/cart';
 
 // ---------- Types ----------

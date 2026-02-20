@@ -20,7 +20,11 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Sun,
+  Moon,
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useAuth } from '@/contexts/AuthContext'; // Add this
 
 // ---------- React Query Hooks ----------
 import { 
@@ -37,15 +41,46 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-GB');
 };
 
+// Helper to resolve avatar URL
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // Extract just the filename
+  const filename = raw.split('/').pop() || raw;
+  
+  // Return the correct storage path
+  return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
+};
+
 // ---------- Main Component ----------
 export default function CustomerDetailsPage() {
   const params = useParams();
   const customerId = params.id as string;
+  const { theme, setTheme } = useTheme(); 
+  const { user } = useAuth(); 
+  const [mounted, setMounted] = useState(false);
 
   // ---------- Local State ----------
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [orderPage, setOrderPage] = useState(1);
   const ordersPerPage = 5;
+
+  // Get avatar URL
+  const avatarUrl = user?.avatar_url || user?.avatar 
+    ? resolveAvatar(user.avatar_url || user.avatar) 
+    : '/man.png';
+
+  // Handle image error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
 
   // ---------- React Query ----------
   const {
@@ -62,6 +97,11 @@ export default function CustomerDetailsPage() {
   } = useAdminCustomerOrders(customerId);
 
   const deleteOrder = useDeleteCustomerOrder();
+
+  // ---------- Mount ----------
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ---------- Error Handling ----------
   useEffect(() => {
@@ -104,7 +144,7 @@ export default function CustomerDetailsPage() {
   );
 
   // ---------- Loading State ----------
-  if (customerLoading) {
+  if (!mounted || customerLoading) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-[#4EA674]" />
@@ -145,8 +185,27 @@ export default function CustomerDetailsPage() {
             <Settings className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
 
+          {/* Theme toggle - optional, add if you want it */}
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            {theme === 'dark' ? (
+              <Sun className="h-5 w-5 text-yellow-500" />
+            ) : (
+              <Moon className="h-5 w-5 text-blue-400" />
+            )}
+          </button>
+
+          {/* Dynamic Avatar */}
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
+            <img
+              src={avatarUrl}
+              alt="Admin"
+              className="object-cover w-full h-full"
+              onError={handleImageError}
+            />
           </div>
         </div>
       </header>

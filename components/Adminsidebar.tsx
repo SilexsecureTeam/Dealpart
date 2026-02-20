@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Package, Users, Tag, Layers, Receipt, Star, PlusCircle,
   Image as ImageIcon, List, MessageSquare, UserCog, Shield, ChevronRight, Store, Menu,
-  X,
+  X, LogOut,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const mainMenu = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
@@ -23,7 +24,7 @@ const mainMenu = [
 const productMenu = [
   { icon: PlusCircle, label: "Add Products", path: "/admin/product/add" },
   { icon: ImageIcon, label: "Product Media", path: "/admin/product/media" },
-  { icon: List, label: "Product List", path: "/admin/product" },
+  { icon: List, label: "Product List", path: "/admin/product/list" },
   { icon: MessageSquare, label: "Product Reviews", path: "/admin/product/reviews" },
 ];
 
@@ -32,13 +33,82 @@ const adminMenu = [
   { icon: Shield, label: "Control Authority", path: "/admin/authority" },
 ];
 
+// Helper to resolve avatar URL
+const resolveAvatar = (pathOrUrl: string | null | undefined): string | null => {
+  if (!pathOrUrl || String(pathOrUrl).trim() === '') return null;
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // The base URL for storage (remove /api from the API URL)
+  const base = (process.env.NEXT_PUBLIC_API_URL || 'https://admin.bezalelsolar.com/api').replace('/api', '');
+  
+  // If it starts with 'avatars/' 
+  if (raw.startsWith('avatars/')) {
+    return `${base}/storage/${raw}`;
+  }
+  
+  // If it's just a filename (no slashes)
+  if (!raw.includes('/')) {
+    return `${base}/storage/avatars/${raw}`;
+  }
+  
+  // For any other path
+  return `${base}/storage/${raw}`;
+};
+
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("/man.png");
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
-  const toggleMobile = () => setMobileOpen(!mobileOpen);
+  const toggleMobile = () => setMobileOpen(!toggleMobile);
+
+  const handleLogout = () => {
+    logout();
+  };
+
+  // Update avatar when user changes
+  useEffect(() => {
+    const loadAvatar = async () => {
+      if (!user) {
+        setAvatarUrl("/man.png");
+        return;
+      }
+
+      const fromApi = user.avatar_url || user.avatar || null;
+      const real = resolveAvatar(fromApi);
+      
+      if (!real) {
+        setAvatarUrl("/man.png");
+        return;
+      }
+
+      // Add cache buster to force fresh load
+      setAvatarUrl(`${real}?t=${Date.now()}`);
+    };
+
+    loadAvatar();
+  }, [user]);
+
+  // Handle image error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
+
+  // Get user display info
+  const displayName = user?.name || 
+    (user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : 
+    user?.email?.split('@')[0] || 'Dealport');
+  
+  const displayEmail = user?.email || 'admin@dealport.com';
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -123,27 +193,34 @@ export default function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* Bottom section - User info + Your Shop (visible on both desktop & mobile) */}
+      {/* Bottom section - Dynamic User info */}
       <div className="border-t border-gray-200 dark:border-gray-700 px-4 pt-5 pb-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-              <Image
-                src="/man.png"
-                alt="Admin avatar"
-                width={44}
-                height={44}
+              <img
+                src={avatarUrl}
+                alt={displayName}
                 className="w-full h-full object-cover"
+                onError={handleImageError}
               />
             </div>
-            <div>
-              <p className="font-bold text-sm text-gray-900 dark:text-white">Dealport</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[180px]">
-                Mark@thedesigner...
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                {displayName}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
+                {displayEmail}
               </p>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-gray-400" />
+          <button
+            onClick={handleLogout}
+            className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors group"
+            title="Logout"
+          >
+            <LogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors" />
+          </button>
         </div>
 
         <Link

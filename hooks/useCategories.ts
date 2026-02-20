@@ -1,6 +1,6 @@
 // hooks/useCategories.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/apiClient';
+import { api } from '@/lib/api'; // Changed from apiClient to api
 
 export interface Category {
   id: number;
@@ -18,9 +18,10 @@ export const useCategories = () => {
   return useQuery({
     queryKey: ['admin', 'categories'],
     queryFn: async () => {
-      const response = await api.categories.list();
+      const response = await api.get('/categories');
+      const data = response.data || response;
       // Handle different response shapes
-      const list = Array.isArray(response) ? response : response?.data || [];
+      const list = Array.isArray(data) ? data : data?.data || [];
       return list as Category[];
     },
     staleTime: 5 * 60 * 1000,
@@ -33,10 +34,16 @@ export const useCreateCategory = () => {
   return useMutation({
     mutationFn: async (data: string | FormData) => {
       if (typeof data === 'string') {
-        return api.categories.create(data);
+        // Simple case - just name as string
+        const response = await api.post('/categories', { name: data });
+        return response.data;
+      } else {
+        // FormData case - includes image and description
+        const response = await api.post('/categories', data, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
       }
-      // Use the new method that supports full FormData
-      return api.categories.createWithDetails(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
@@ -49,8 +56,12 @@ export const useUpdateCategory = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: FormData }) => {
-      // Use the new method that supports full FormData
-      return api.categories.updateWithDetails(id, data);
+      // Add _method field for Laravel-style PATCH
+      data.append('_method', 'PATCH');
+      const response = await api.post(`/categories/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });
@@ -63,7 +74,8 @@ export const useDeleteCategory = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      return api.categories.delete(id);
+      const response = await api.delete(`/categories/${id}`);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] });

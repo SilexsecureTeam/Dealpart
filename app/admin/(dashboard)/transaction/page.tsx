@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/contexts/AuthContext'; // Add this
 
 // ---------- React Query Hooks ----------
 import { useTransactionStats } from '@/hooks/useTransactionStats';
@@ -27,6 +28,22 @@ type FilterType = 'all' | 'completed' | 'pending' | 'canceled';
 const formatCurrency = (amount: number | undefined | null) => {
   if (amount === undefined || amount === null) return '₦0';
   return `₦${amount.toLocaleString()}`;
+};
+
+// Helper to resolve avatar URL
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // Extract just the filename
+  const filename = raw.split('/').pop() || raw;
+  
+  // Return the correct storage path
+  return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
 };
 
 // ---------- Loading Skeletons ----------
@@ -61,6 +78,7 @@ const TableRowSkeleton = () => (
 // ---------- Main Page ----------
 export default function TransactionPage() {
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth(); // Add this
   const [mounted, setMounted] = useState(false);
 
   // ---------- Local State ----------
@@ -73,6 +91,18 @@ export default function TransactionPage() {
 
   // ---------- Toast Message ----------
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Get avatar URL
+  const avatarUrl = user?.avatar_url || user?.avatar 
+    ? resolveAvatar(user.avatar_url || user.avatar) 
+    : '/man.png';
+
+  // Handle image error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
 
   // ---------- Debounce Search ----------
   useEffect(() => {
@@ -184,8 +214,14 @@ export default function TransactionPage() {
             />
           </button>
 
+          {/* Dynamic Avatar */}
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600">
-            <Image src="/man.png" alt="Admin" width={40} height={40} className="object-cover w-full h-full" />
+            <img
+              src={avatarUrl}
+              alt="Admin"
+              className="object-cover w-full h-full"
+              onError={handleImageError}
+            />
           </div>
         </div>
       </header>
@@ -343,26 +379,12 @@ export default function TransactionPage() {
                       <p><span className="text-gray-600 dark:text-gray-300">Transactions:</span> 1,250</p>
                       <p><span className="text-gray-600 dark:text-gray-300">Revenue:</span> ₦500,000</p>
                     </div>
-                    <div className="mt-4">
-                      <p className="text-xl font-mono tracking-wider text-gray-900 dark:text-white mb-1">
-                        •••• •••• •••• 2345
-                      </p>
-                      <div className="grid grid-cols-2 gap-6 text-sm">
-                        <div>
-                          <p className="text-gray-500 dark:text-gray-400">Card Holder Name</p>
-                          <p className="font-medium text-gray-900 dark:text-white">Noman Manzoor</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 dark:text-gray-400">Expiry Date</p>
-                          <p className="font-medium text-gray-900 dark:text-white">02/30</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  
                   <button className="mt-4 self-start text-[#4EA674] hover:underline text-sm font-medium">
                     View Transactions
                   </button>
                 </div>
+               </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button className="flex-1 px-5 py-3 bg-[#4EA674] text-white rounded-xl text-sm font-medium hover:bg-[#3D8B59] transition flex items-center justify-center gap-2">

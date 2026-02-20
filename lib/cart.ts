@@ -23,12 +23,28 @@ export async function getCart(): Promise<any[]> {
 
   try {
     const json = await customerApi.cart.get();
-    return Array.isArray(json?.data) ? json.data : [];
+    
+    // Handle different response structures
+    if (json?.data) {
+      return Array.isArray(json.data) ? json.data : [];
+    }
+    if (Array.isArray(json)) {
+      return json;
+    }
+    if (json?.items) {
+      return Array.isArray(json.items) ? json.items : [];
+    }
+    
+    return [];
   } catch (err: any) {
+    console.error("Cart fetch error:", err);
+    
     // If session expired, clear token
     if (err?.message?.includes("401") || err?.message?.includes("SESSION_EXPIRED")) {
       customerApi.auth.logout();
     }
+    
+    // Return empty array on any error
     return [];
   }
 }
@@ -64,7 +80,49 @@ export async function addToCart(product_id: number, quantity: number, price: num
     throw new Error("Price is required");
   }
 
-  const data = await customerApi.cart.add(product_id, quantity, price);
-  emitCartUpdated();
-  return data;
+  try {
+    const data = await customerApi.cart.add(product_id, quantity, price);
+    emitCartUpdated();
+    return data;
+  } catch (err: any) {
+    console.error("Add to cart error:", err);
+    if (err?.message?.includes("401")) {
+      throw new Error("LOGIN_REQUIRED");
+    }
+    throw err;
+  }
+}
+
+/**
+ * Update cart item quantity
+ */
+export async function updateCartItem(itemId: number, quantity: number) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("customerToken") : null;
+  if (!token) throw new Error("LOGIN_REQUIRED");
+
+  try {
+    const data = await customerApi.cart.update(itemId, quantity);
+    emitCartUpdated();
+    return data;
+  } catch (err: any) {
+    console.error("Update cart error:", err);
+    throw err;
+  }
+}
+
+/**
+ * Remove item from cart
+ */
+export async function removeFromCart(itemId: number) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("customerToken") : null;
+  if (!token) throw new Error("LOGIN_REQUIRED");
+
+  try {
+    const data = await customerApi.cart.remove(itemId);
+    emitCartUpdated();
+    return data;
+  } catch (err: any) {
+    console.error("Remove from cart error:", err);
+    throw err;
+  }
 }

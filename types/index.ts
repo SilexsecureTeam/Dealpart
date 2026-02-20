@@ -11,6 +11,7 @@ export interface User {
   expires_at: string | null;
   google_id: string | null;
   avatar: string | null;
+  avatar_url: string | null;
   first_name: string | null;
   last_name: string | null;
   dob: string | null;
@@ -138,6 +139,16 @@ export interface CartItem {
   customizations?: any[];
 }
 
+export interface OrderItem {
+  id: number;
+  product_id: number;
+  product?: Product;
+  quantity: number;
+  price: number;
+  color?: string;
+  customizations?: any[];
+}
+
 export interface Cart {
   items: CartItem[];
   total: number;
@@ -165,13 +176,42 @@ export interface Order {
   updated_at: string;
 }
 
-export interface OrderItem {
-  product_id: number;
-  product: Product;
-  quantity: number;
+// types/index.ts
+export interface OrderListItem {
+  id: string | number;
+  order_id: string;
+  product_name: string;
+  product_image?: string;
+  date: string;
   price: number;
-  color?: string;
-  customizations?: any[];
+  customer_name?: string;
+  customer_email?: string;
+  // Required fields for the order management page
+  payment_status: 'Paid' | 'Unpaid' | 'Pending' | 'Refunded';
+  order_status: 'Delivered' | 'Shipped' | 'Pending' | 'Canceled' | 'Processing';
+  // Optional fields
+  customer?: {
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  items?: Array<{
+    product_id: number;
+    product_name: string;
+    quantity: number;
+    price: number;
+  }>;
+  total?: number;
+  subtotal?: number;
+  tax?: number;
+  delivery_fee?: number;
+  discount?: number;
+  shipping_address?: string;
+  payment_method?: string;
+  payment_reference?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Coupon {
@@ -313,28 +353,29 @@ export interface TransactionStats {
   failedPercent: string;
 }
 
-export type OrderStatus = 'Delivered' | 'Shipped' | 'Pending' | 'Cancelled';
-export type PaymentStatus = 'Paid' | 'Unpaid';
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Canceled' | 'Cancelled';
+export type PaymentStatus = 'Paid' | 'Unpaid' | 'Pending';
 
+// types/index.ts
 export interface OrderListItem {
-  id: string;
+  id: string | number;
   order_id: string;
   product_name: string;
   product_image?: string;
   date: string;
   price: number;
-  payment_status: PaymentStatus;
-  order_status: OrderStatus;
+  customer_name?: string;
+  customer_email?: string;
 }
 
 export interface OrderStats {
   totalOrders: number;
-  newOrders: number;
-  completedOrders: number;
-  canceledOrders: number;
   totalOrdersChange: string;
+  newOrders: number;
   newOrdersChange: string;
+  completedOrders: number;
   completedPercent: string;
+  canceledOrders: number;
   canceledChange: string;
 }
 

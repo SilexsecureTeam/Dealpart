@@ -21,7 +21,6 @@ const authFetch = (url: string, options: RequestInit = {}) => {
   return fetch(url, { ...options, headers });
 };
 
-// ---------- Type Definitions ----------
 interface RegisterData {
   name: string;
   username?: string;
@@ -38,9 +37,7 @@ interface ProfileUpdateData {
   avatar?: File;
 }
 
-// ---------- Customer API Client ----------
 export const customerApi = {
-  // 🔐 Authentication
   auth: {
     login: async (login: string, password: string) => {
       const form = new FormData();
@@ -80,7 +77,6 @@ export const customerApi = {
       const json = await res.json();
 
       if (!res.ok) {
-        // ✅ Safe error extraction with fallback
         let errorMessage = json?.message || 'Registration failed';
         if (json?.errors && typeof json.errors === 'object') {
           const values = Object.values(json.errors);
@@ -120,7 +116,21 @@ export const customerApi = {
     },
   },
 
-  // 👤 Profile
+  brands: {
+    list: () => {
+      const url = 'https://admin.bezalelsolar.com/api/brand';
+      console.log('Fetching customer brands from:', url);
+      return fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        }
+      }).then(res => {
+        console.log('Response status:', res.status);
+        return res.json();
+      });
+    },
+  },
+
   profile: {
     get: () => authFetch(Endpoints.customer.profile).then((res) => res.json()),
 
@@ -149,7 +159,6 @@ export const customerApi = {
     },
   },
 
-  // 📦 Products (public)
   products: {
     list: (params?: URLSearchParams) =>
       fetch(`${Endpoints.customer.products}${params ? `?${params}` : ''}`, {
@@ -162,46 +171,60 @@ export const customerApi = {
       }).then((res) => res.json()),
   },
 
- 
-  // 🛒 Cart
   cart: {
     get: () => authFetch(Endpoints.customer.cart).then((res) => res.json()),
+    
     add: async (product_id: number, quantity: number, price: number) => {
       const token = getToken();
       if (!token) throw new Error('LOGIN_REQUIRED');
-      const res = await authFetch(Endpoints.customer.cartAdd, {
-        method: 'POST',
-        body: JSON.stringify({ product_id, quantity, price }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || 'Failed to add to cart');
-      return json;
+      
+      try {
+        const res = await authFetch(Endpoints.customer.cartAdd, {
+          method: 'POST',
+          body: JSON.stringify({ product_id, quantity, price }),
+        });
+        
+        if (!res.ok) {
+          if (res.status === 500) {
+            throw new Error('SERVER_ERROR');
+          }
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData?.message || `Failed to add to cart (${res.status})`);
+        }
+        
+        const json = await res.json();
+        return json;
+      } catch (error) {
+        console.error('Cart add error:', error);
+        throw error; 
+      }
     },
+    
     update: (id: number, quantity: number) =>
       authFetch(Endpoints.customer.cartUpdate(id), {
         method: 'PUT',
         body: JSON.stringify({ quantity }),
       }).then((res) => res.json()),
+    
     remove: (id: number) =>
       authFetch(Endpoints.customer.cartRemove(id), {
         method: 'DELETE',
       }).then((res) => res.json()),
   },
 
-  // ✅ CHECKOUT – new
   checkout: {
     create: (data: CheckoutPayload): Promise<CheckoutResponse> =>
       authFetch(Endpoints.customer.checkout, {
         method: 'POST',
         body: JSON.stringify(data),
       }).then((res) => res.json()),
+    
     verify: (reference: string): Promise<VerifyPaymentResponse> =>
       authFetch(`${Endpoints.customer.verifyPayment}/${reference}`, {
         method: 'GET',
       }).then((res) => res.json()),
   },
 
-  // ✅ COUPONS – new
   coupons: {
     apply: (code: string) =>
       authFetch(`${Endpoints.customer.coupons}/apply`, {
@@ -209,23 +232,111 @@ export const customerApi = {
         body: JSON.stringify({ code }),
       }).then((res) => res.json()),
   },
-// ---------- Wishlist ----------
-wishlist: {
-  list: (params?: URLSearchParams) => {
-    const url = params
-      ? `${Endpoints.customer.wishlist}?${params}`
-      : Endpoints.customer.wishlist;
-    return authFetch(url).then((res) => res.json());
-  },
-  add: (productId: number) =>
-    authFetch(Endpoints.customer.wishlist, {
-      method: 'POST',
-      body: JSON.stringify({ product_id: productId }),
-    }).then((res) => res.json()),
-  remove: (id: number) =>
-    authFetch(Endpoints.customer.wishlistItem(id), {
-      method: 'DELETE',
-    }).then((res) => res.json()),
-},
 
+ // In customerApiClient.ts - wishlist section
+wishlist: {
+  list: async (params?: URLSearchParams) => {
+    try {
+      const url = params
+        ? `${Endpoints.customer.wishlist}?${params}`
+        : Endpoints.customer.wishlist;
+      console.log('Fetching wishlist from:', url);
+      const res = await authFetch(url);
+      
+      if (!res.ok) {
+        console.error('Wishlist fetch failed:', res.status);
+        const errorText = await res.text();
+        console.error('Error response:', errorText);
+        return { data: [] };
+      }
+      
+      const data = await res.json();
+      console.log('Wishlist fetch response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching wishlist:', error);
+      return { data: [] };
+    }
+  },
+  
+  add: async (productId: number) => {
+    try {
+      console.log('Adding product to wishlist:', productId);
+      const res = await authFetch(Endpoints.customer.wishlist, {
+        method: 'POST',
+        body: JSON.stringify({ product_id: productId }),
+      });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Add to wishlist error response:', errorText);
+        try {
+          const error = JSON.parse(errorText);
+          throw new Error(error?.message || 'Failed to add to wishlist');
+        } catch {
+          throw new Error('Failed to add to wishlist');
+        }
+      }
+      
+      const data = await res.json();
+      console.log('Add to wishlist response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error adding to wishlist:', error);
+      throw error;
+    }
+  },
+  
+  remove: async (id: number) => {
+    try {
+      console.log('API: Removing wishlist item with ID:', id);
+      console.log('API: Endpoint:', Endpoints.customer.wishlistItem(id));
+      
+      const res = await authFetch(Endpoints.customer.wishlistItem(id), {
+        method: 'DELETE',
+      });
+      
+      console.log('API: Remove response status:', res.status);
+      
+      // Try to get response body for debugging
+      const responseText = await res.text();
+      console.log('API: Remove response body:', responseText);
+      
+      if (res.status === 404) {
+        console.error('Wishlist item not found with ID:', id);
+        console.error('Error response:', responseText);
+        
+        // Try to parse the error message
+        let errorMessage = 'Wishlist item not found';
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData?.message || errorMessage;
+        } catch {
+          // Use default message
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      if (!res.ok) {
+        throw new Error(`Failed to remove from wishlist (${res.status})`);
+      }
+      
+      // If successful, try to parse response or return success
+      if (res.status === 204) {
+        return { success: true, id };
+      }
+      
+      try {
+        const data = JSON.parse(responseText);
+        return data;
+      } catch {
+        return { success: true, id };
+      }
+    } catch (error) {
+      console.error('Error removing from wishlist:', error);
+      throw error;
+    }
+  },
+},
 } as const;

@@ -26,6 +26,12 @@ const brandOptions = [
   ...Array.from(new Set(fallbackProducts.map((p) => p.brand).filter(Boolean))),
 ];
 
+// Helper function to safely get image URL
+const getSafeImageUrl = (image: string | null | undefined): string | null => {
+  if (!image || image.trim() === '') return null;
+  return image;
+};
+
 export default function ShopPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,6 +47,7 @@ export default function ShopPage() {
   const [brand, setBrand] = useState('All Brands');
   const [applyFilter, setApplyFilter] = useState(false);
   const [sortBy, setSortBy] = useState('default');
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   // 🔥 FIXED: Only update when products actually change
   useEffect(() => {
@@ -80,6 +87,11 @@ export default function ShopPage() {
   useEffect(() => {
     setApplyFilter(false);
   }, [priceMax, brand]);
+
+  // Handle image error
+  const handleImageError = (productId: number) => {
+    setImageErrors(prev => ({ ...prev, [productId]: true }));
+  };
 
   // Wishlist toggle
   const handleWishlistToggle = async (productId: number) => {
@@ -216,14 +228,33 @@ export default function ShopPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
                 {displayProducts.map((p) => {
                   const isInWishlist = wishlist.some((item) => item.product_id === p.id);
+                  const safeImageUrl = getSafeImageUrl(p.image);
+                  const hasImageError = imageErrors[p.id];
+                  
                   return (
                     <div key={p.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-                      <div className="relative pt-[75%]">
-                        <Image src={p.image || '/offer.jpg'} alt={p.name} fill className="object-cover" />
+                      <div className="relative pt-[75%] bg-gray-100">
+                        {/* FIXED: Conditional image rendering with fallback */}
+                        {safeImageUrl && !hasImageError ? (
+                          <Image 
+                            src={safeImageUrl} 
+                            alt={p.name} 
+                            fill 
+                            className="object-cover"
+                            onError={() => handleImageError(p.id)}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-4xl font-bold text-[#4EA674]/30">
+                              {p.name.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                        
                         <button
                           onClick={() => handleWishlistToggle(p.id)}
                           disabled={addToWishlist.isPending || removeFromWishlist.isPending}
-                          className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition"
+                          className="absolute top-3 right-3 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition z-10"
                         >
                           <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
                         </button>

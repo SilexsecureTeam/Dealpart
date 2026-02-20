@@ -15,9 +15,10 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { customerApi } from "@/lib/customerApiClient";
 import { getCart, calcCartSummary, onCartUpdated } from "@/lib/cart";
+import { useAuth } from "@/contexts/AuthContext"; // Add this
 
 export default function PublicHeader() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { user, logout: authLogout, refreshUser } = useAuth(); // Use auth context
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // cart UI
@@ -29,19 +30,6 @@ export default function PublicHeader() {
   const pathname = usePathname();
 
   const nextParam = encodeURIComponent(pathname || "/");
-
-  // --- auth check ---
-  useEffect(() => {
-    const checkAuth = () => {
-      if (typeof window === "undefined") return false;
-      return !!localStorage.getItem("customerToken");
-    };
-    setIsLoggedIn(checkAuth());
-
-    const handleStorage = () => setIsLoggedIn(checkAuth());
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
 
   // --- cart refresh ---
   async function refreshCart() {
@@ -73,13 +61,25 @@ export default function PublicHeader() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  // Refresh user profile when component mounts (optional)
+  useEffect(() => {
+    if (user) {
+      refreshUser(); // Get latest user data
+    }
+  }, []);
+
   // --- logout ---
   function logout() {
     customerApi.auth.logout();
-    setIsLoggedIn(false);
+    authLogout(); // Call auth context logout
     setUserMenuOpen(false);
     router.push(`/login?next=${encodeURIComponent("/")}`);
   }
+
+  // Get display name
+  const displayName = user?.name || 
+    (user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : 
+    user?.email?.split('@')[0] || 'Account');
 
   return (
     <>
@@ -123,7 +123,7 @@ export default function PublicHeader() {
             </div>
 
             {/* User icon: login or dropdown */}
-            {!isLoggedIn ? (
+            {!user ? (
               <Link
                 href={`/login?next=${nextParam}`}
                 className="p-2 hover:bg-gray-100 rounded-full"
@@ -135,14 +135,15 @@ export default function PublicHeader() {
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setUserMenuOpen((s) => !s)}
-                  className="p-2 hover:bg-gray-100 rounded-full"
+                  className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full"
                   title="Account"
                 >
                   <User className="w-6 h-6 text-gray-700" />
+                  <span className="text-sm font-medium hidden sm:inline">{displayName}</span>
                 </button>
 
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-44 bg-white border rounded-xl shadow-lg overflow-hidden z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white border rounded-xl shadow-lg overflow-hidden z-50">
                     <Link
                       href="/account"
                       className="block px-4 py-3 text-sm hover:bg-gray-50"
@@ -157,6 +158,13 @@ export default function PublicHeader() {
                     >
                       Orders
                     </Link>
+                    <Link
+                      href="/wishlist"
+                      className="block px-4 py-3 text-sm hover:bg-gray-50"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      Wishlist
+                    </Link>
                     <button
                       onClick={logout}
                       className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 text-red-600"
@@ -168,7 +176,7 @@ export default function PublicHeader() {
               </div>
             )}
 
-            {/* 🔥 FIXED: Wishlist link instead of static button */}
+            {/* Wishlist link */}
             <Link
               href="/wishlist"
               className="p-2 hover:bg-gray-100 rounded-full"
@@ -199,6 +207,7 @@ export default function PublicHeader() {
         </div>
       </div>
 
+      {/* Rest of your component remains the same... */}
       {/* MOBILE SEARCH */}
       <div className="md:hidden bg-white py-3 border-t">
         <div className="container mx-auto px-4">
@@ -229,6 +238,9 @@ export default function PublicHeader() {
               </Link>
               <Link href="/brands" className="hover:text-[#4EA674]">
                 Brands
+              </Link>
+              <Link href="/blogss" className="hover:text-[#4EA674]">
+                Blogs
               </Link>
             </div>
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   useCategories, 
   useCreateCategory, 
@@ -29,6 +30,51 @@ import {
   Trash,
 } from 'lucide-react';
 
+// Helper to resolve avatar URL
+const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
+  if (!pathOrUrl) return '/man.png';
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // Extract just the filename
+  const filename = raw.split('/').pop() || raw;
+  
+  // Return the correct storage path
+  return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
+};
+
+// Helper to resolve image URL for categories and products
+const resolveImageUrl = (pathOrUrl: string | null | undefined, fallback = '/solarpanel.png'): string => {
+  if (!pathOrUrl || String(pathOrUrl).trim() === '') return fallback;
+  
+  const raw = String(pathOrUrl).trim();
+  
+  // If it's already a full URL, return as is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  
+  // If it's a data URL (for previews), return as is
+  if (raw.startsWith('data:')) return raw;
+  
+  // The base URL for storage (remove /api from the API URL)
+  const base = (process.env.NEXT_PUBLIC_API_URL || 'https://admin.bezalelsolar.com/api').replace('/api', '');
+  
+  // If it starts with 'storage/' or 'uploads/'
+  if (raw.startsWith('storage/') || raw.startsWith('uploads/')) {
+    return `${base}/${raw}`;
+  }
+  
+  // If it starts with 'avatars/'
+  if (raw.startsWith('avatars/')) {
+    return `${base}/storage/${raw}`;
+  }
+  
+  // If it's just a filename
+  return `${base}/storage/${raw}`;
+};
+
 // ---------- Reusable Components ----------
 interface CategoryCardProps {
   category: Category;
@@ -39,6 +85,7 @@ interface CategoryCardProps {
 
 const CategoryCard = ({ category, onClick, onEdit, onDelete }: CategoryCardProps) => {
   const [showActions, setShowActions] = useState(false);
+  const imageUrl = resolveImageUrl(category.image);
 
   return (
     <div className="relative group">
@@ -47,7 +94,7 @@ const CategoryCard = ({ category, onClick, onEdit, onDelete }: CategoryCardProps
         className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-700 w-full transition-all"
       >
         <Image
-          src={category.image || '/solarpanel.png'}
+          src={imageUrl}
           alt={category.name}
           width={48}
           height={48}
@@ -110,48 +157,52 @@ interface ProductTableRowProps {
   onDelete: (id: number, name: string) => void;
 }
 
-const ProductTableRow = ({ product, index, onEdit, onDelete }: ProductTableRowProps) => (
-  <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-    <td className="px-4 py-4 font-medium text-gray-900 dark:text-white">{index}</td>
-    <td className="px-4 py-4">
-      <div className="flex items-center gap-3">
-        <Image
-          src={product.images?.[0] || '/solarpanel.png'}
-          alt={product.name}
-          width={40}
-          height={40}
-          className="rounded-lg object-cover"
-          unoptimized
-        />
-        <span className="text-gray-900 dark:text-white line-clamp-1">{product.name}</span>
-      </div>
-    </td>
-    <td className="px-4 py-4 text-gray-600 dark:text-gray-300 hidden sm:table-cell">
-      {product.created_at ? new Date(product.created_at).toLocaleDateString('en-GB') : '—'}
-    </td>
-    <td className="px-4 py-4 text-gray-900 dark:text-white hidden md:table-cell">
-      {product.current_stock ?? 0}
-    </td>
-    <td className="px-4 py-4">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => onEdit(product)}
-          className="text-gray-500 hover:text-[#4EA674] transition p-1"
-          aria-label="Edit product"
-        >
-          <Edit2 className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => onDelete(product.id, product.name)}
-          className="text-gray-500 hover:text-red-500 transition p-1"
-          aria-label="Delete product"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
-      </div>
-    </td>
-  </tr>
-);
+const ProductTableRow = ({ product, index, onEdit, onDelete }: ProductTableRowProps) => {
+  const imageUrl = resolveImageUrl(product.images?.[0]);
+
+  return (
+    <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+      <td className="px-4 py-4 font-medium text-gray-900 dark:text-white">{index}</td>
+      <td className="px-4 py-4">
+        <div className="flex items-center gap-3">
+          <Image
+            src={imageUrl}
+            alt={product.name}
+            width={40}
+            height={40}
+            className="rounded-lg object-cover"
+            unoptimized
+          />
+          <span className="text-gray-900 dark:text-white line-clamp-1">{product.name}</span>
+        </div>
+      </td>
+      <td className="px-4 py-4 text-gray-600 dark:text-gray-300 hidden sm:table-cell">
+        {product.created_at ? new Date(product.created_at).toLocaleDateString('en-GB') : '—'}
+      </td>
+      <td className="px-4 py-4 text-gray-900 dark:text-white hidden md:table-cell">
+        {product.current_stock ?? 0}
+      </td>
+      <td className="px-4 py-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onEdit(product)}
+            className="text-gray-500 hover:text-[#4EA674] transition p-1"
+            aria-label="Edit product"
+          >
+            <Edit2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => onDelete(product.id, product.name)}
+            className="text-gray-500 hover:text-red-500 transition p-1"
+            aria-label="Delete product"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+};
 
 // ---------- Category Modal Component ----------
 interface CategoryModalProps {
@@ -257,7 +308,7 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, initialData, title, isPendin
             {imagePreview ? (
               <div className="relative w-full h-32">
                 <Image
-                  src={imagePreview}
+                  src={imagePreview.startsWith('data:') ? imagePreview : resolveImageUrl(imagePreview)}
                   alt="Preview"
                   fill
                   className="object-cover rounded-lg"
@@ -399,6 +450,7 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, categoryName, isPending }: De
 export default function CategoriesPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   // React Query
@@ -412,7 +464,10 @@ export default function CategoriesPage() {
     data: productsData,
     isLoading: productsLoading,
     error: productsError,
-  } = useProducts(1, 999);
+  } = useProducts({ 
+    page: 1, 
+    limit: 999 
+  });
 
   const deleteProduct = useDeleteProduct();
   const createCategory = useCreateCategory();
@@ -432,6 +487,18 @@ export default function CategoriesPage() {
 
   // Toast Message
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Get avatar URL
+  const avatarUrl = user?.avatar_url || user?.avatar 
+    ? resolveAvatar(user.avatar_url || user.avatar) 
+    : '/man.png';
+
+  // Handle image error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src === '/man.png') return;
+    img.src = '/man.png';
+  };
 
   // Derived Data
   const allProducts = productsData?.data || [];
@@ -565,15 +632,13 @@ export default function CategoriesPage() {
             />
           </button>
 
-          {/* Admin Avatar */}
+          {/* Admin Avatar - Dynamic */}
           <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-600 hidden sm:block">
-            <Image
-              src="/man.png"
+            <img
+              src={avatarUrl}
               alt="Admin"
-              width={36}
-              height={36}
               className="object-cover w-full h-full"
-              unoptimized
+              onError={handleImageError}
             />
           </div>
         </div>

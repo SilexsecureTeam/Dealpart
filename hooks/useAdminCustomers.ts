@@ -1,6 +1,5 @@
-// hooks/useAdminCustomers.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/apiClient';
+import { api } from '@/lib/api';
 import { 
   AdminCustomer, 
   CustomerDetails, 
@@ -9,7 +8,6 @@ import {
   CustomerOrder 
 } from '@/types';
 
-// ---------- Fetch paginated customers (LIST PAGE) ----------
 export const useAdminCustomers = (page: number, limit: number, search?: string) => {
   return useQuery({
     queryKey: ['admin', 'customers', page, limit, search],
@@ -20,7 +18,7 @@ export const useAdminCustomers = (page: number, limit: number, search?: string) 
         ...(search && { search }),
       });
       
-      const response = await api.admin.users.list(params);
+      const response = await api.get(`/admin/users?${params.toString()}`);
       const data = response.data || response;
       
       return {
@@ -35,46 +33,50 @@ export const useAdminCustomers = (page: number, limit: number, search?: string) 
   });
 };
 
-// ---------- Fetch customer stats (LIST PAGE) ----------
 export const useCustomerStats = () => {
   return useQuery({
     queryKey: ['admin', 'customers', 'stats'],
     queryFn: async () => {
-      // Replace with real endpoint if available
-      return {
-        totalCustomers: 11040,
-        newCustomers: 2370,
-        visitors: 250000,
-        activeCustomers: 25000,
-        repeatCustomers: 5600,
-        shopVisitors: 250000,
-        conversionRate: 5.5,
-        totalCustomersChange: '↑ 14.4%',
-        newCustomersChange: '↑ 20%',
-        visitorsChange: '↑ 20%',
-      } as CustomerStats;
+      try {
+        const response = await api.get('/admin/customers/stats');
+        return response.data;
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Using mock customer stats (API endpoint not available)');
+        }
+        return {
+          totalCustomers: 11040,
+          newCustomers: 2370,
+          visitors: 250000,
+          activeCustomers: 25000,
+          repeatCustomers: 5600,
+          shopVisitors: 250000,
+          conversionRate: 5.5,
+          totalCustomersChange: '↑ 14.4%',
+          newCustomersChange: '↑ 20%',
+          visitorsChange: '↑ 20%',
+        } as CustomerStats;
+      }
     },
     staleTime: 5 * 60 * 1000,
   });
 };
 
-// ---------- Delete a customer (LIST PAGE) ----------
 export const useDeleteCustomer = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (userId: number) => api.admin.users.delete(userId),
+    mutationFn: (userId: number) => api.delete(`/admin/users/${userId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] });
     },
   });
 };
 
-// ---------- Fetch single customer details (DETAIL PAGE) ----------
 export const useAdminCustomerDetails = (id: string | number) => {
   return useQuery({
     queryKey: ['admin', 'customers', id],
     queryFn: async () => {
-      const response = await api.admin.users.detail(id);
+      const response = await api.get(`/admin/users/${id}`);
       const data = response.data || response;
       return (data.user || data.customer || data) as CustomerDetails;
     },
@@ -84,7 +86,6 @@ export const useAdminCustomerDetails = (id: string | number) => {
   });
 };
 
-// ---------- Fetch customer orders (DETAIL PAGE) ----------
 export const useAdminCustomerOrders = (customerId: string | number) => {
   return useQuery({
     queryKey: ['admin', 'customers', customerId, 'orders'],
@@ -93,7 +94,7 @@ export const useAdminCustomerOrders = (customerId: string | number) => {
         customer_id: String(customerId),
         limit: '100',
       });
-      const response = await api.orders.list(params);
+      const response = await api.get(`/orders?${params.toString()}`);
       const data = response.data || response;
       return (data.orders || data.data || []) as CustomerOrder[];
     },
@@ -103,13 +104,11 @@ export const useAdminCustomerOrders = (customerId: string | number) => {
   });
 };
 
-// ---------- Delete a customer order (DETAIL PAGE) ----------
 export const useDeleteCustomerOrder = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (orderId: string) => api.orders.delete(orderId),
+    mutationFn: (orderId: string) => api.delete(`/orders/${orderId}`),
     onSuccess: (_, orderId) => {
-      // Invalidate all customer orders queries
       queryClient.invalidateQueries({ 
         queryKey: ['admin', 'customers'], 
         predicate: (query) => query.queryKey.includes('orders') 
@@ -118,12 +117,11 @@ export const useDeleteCustomerOrder = () => {
   });
 };
 
-// ---------- Update customer role / status ----------
 export const useUpdateCustomerRole = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: string }) =>
-      api.admin.users.update(userId, { role }),
+      api.patch(`/admin/users/${userId}`, { role }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'customers', variables.userId] });
