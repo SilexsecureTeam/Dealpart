@@ -179,7 +179,7 @@ export default function LandingPage() {
           <ChevronRight className="w-6 h-6 md:w-7 md:h-7 text-white" />
         </button>
 
-        <div className="relative z-10 container mx-auto px-5 sm:px-8 text-left text-white">
+        <div className="relative z-10 container mx-auto pl-16 sm:pl-24 lg:pl-32 pr-5 text-left text-white">
           <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight ${styles.animateSlideUp}`}>
             Energy Independence Starts Here
           </h1>
