@@ -162,41 +162,40 @@ export default function LandingPage() {
       )}
 
       <section className="relative min-h-[70vh] flex items-center overflow-hidden">
-        <Image
-          src="/homebg.png"
-          alt="Energy Independence"
-          fill
-          priority
-          className="object-cover scale-105 brightness-[0.92]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#023337cc] via-[#02333788] to-transparent" />
-        
-        <button className="absolute left-4 md:left-8 z-20 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition">
-          <ChevronLeft className="w-6 h-6 md:w-7 md:h-7 text-white" />
-        </button>
-        
-        <button className="absolute right-4 md:right-8 z-20 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition">
-          <ChevronRight className="w-6 h-6 md:w-7 md:h-7 text-white" />
-        </button>
+  <Image
+    src="/homebg.png"
+    alt="Energy Independence"
+    fill
+    priority
+    className="object-cover scale-105 brightness-[0.92]"
+  />
+  <div className="absolute inset-0 bg-gradient-to-r from-[#023337cc] via-[#02333788] to-transparent" />
+  
+  <button className="absolute left-4 md:left-8 z-20 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition">
+    <ChevronLeft className="w-6 h-6 md:w-7 md:h-7 text-white" />
+  </button>
+  
+  <button className="absolute right-4 md:right-8 z-20 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition">
+    <ChevronRight className="w-6 h-6 md:w-7 md:h-7 text-white" />
+  </button>
 
-        <div className="relative z-10 container mx-auto pl-16 sm:pl-24 lg:pl-32 pr-5 text-left text-white">
-          <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight ${styles.animateSlideUp}`}>
-            Energy Independence Starts Here
-          </h1>
-          <p className={`text-lg sm:text-xl md:text-2xl lg:text-3xl mb-10 max-w-3xl text-white ${styles.animateSlideUp} ${styles.animationDelay200}`}>
-            Spring Sale: Free Shipping on orders over ₦500,000.
-          </p>
-          <div className={`${styles.animateSlideUp} ${styles.animationDelay400}`}>
-            <button 
-              onClick={handleShopNow}
-              className="bg-[#4EA674] hover:bg-[#3D8B59] text-white font-bold px-10 py-5 rounded-full text-lg shadow-xl hover:shadow-2xl transition hover:scale-105"
-            >
-              Shop Now
-            </button>
-          </div>
-        </div>
-      </section>
-
+  <div className="relative z-10 container mx-auto px-5 sm:px-8 md:pl-20 lg:pl-24 text-left text-white">
+    <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight ${styles.animateSlideUp}`}>
+      Energy Independence Starts Here
+    </h1>
+    <p className={`text-lg sm:text-xl md:text-2xl lg:text-3xl mb-10 max-w-3xl text-white ${styles.animateSlideUp} ${styles.animationDelay200}`}>
+      Spring Sale: Free Shipping on orders over ₦500,000.
+    </p>
+    <div className={`${styles.animateSlideUp} ${styles.animationDelay400}`}>
+      <button 
+        onClick={handleShopNow}
+        className="bg-[#4EA674] hover:bg-[#3D8B59] text-white font-bold px-10 py-5 rounded-full text-lg shadow-xl hover:shadow-2xl transition hover:scale-105"
+      >
+        Shop Now
+      </button>
+    </div>
+  </div>
+</section>
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-5 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
