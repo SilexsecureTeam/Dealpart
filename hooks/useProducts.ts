@@ -20,6 +20,7 @@ export interface CreateProductPayload {
   barcode?: string;
   cost_price?: string | number;
   is_active?: boolean;
+  tag_ids?: number[];
 }
 
 export interface UpdateProductPayload extends Partial<CreateProductPayload> {

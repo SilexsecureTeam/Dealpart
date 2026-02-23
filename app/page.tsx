@@ -48,7 +48,7 @@ function SafeImage({ src, alt, className = '', fill = false, width, height, prio
         width={width}
         height={height}
         className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-        onLoadingComplete={() => setIsLoading(false)}
+        onLoad={() => setIsLoading(false)}
         onError={() => {
           setImgSrc('/solarpanel.png');
           setIsLoading(false);
@@ -109,7 +109,7 @@ export default function LandingPage() {
     try {
       setAdding((prev) => ({ ...prev, [id]: true }));
       setCartError(null);
-      await addToCart(id, 1, price);
+      await addToCart(id, 1, price, 'default');
     } catch (e: any) {
       console.error('Add to cart error:', e);
       if (e?.message === "LOGIN_REQUIRED" || e?.message === "SESSION_EXPIRED") {
@@ -180,7 +180,7 @@ export default function LandingPage() {
   </button>
 
   <div className="relative z-10 container mx-auto px-5 sm:px-8 md:pl-20 lg:pl-24 text-left text-white">
-    <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight ${styles.animateSlideUp}`}>
+    <h1 className={`text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-6 leading-tight ${styles.animateSlideUp}`}>
       Energy Independence Starts Here
     </h1>
     <p className={`text-lg sm:text-xl md:text-2xl lg:text-3xl mb-10 max-w-3xl text-white ${styles.animateSlideUp} ${styles.animationDelay200}`}>

@@ -69,8 +69,14 @@ export function calcCartSummary(items: any[]) {
 
 /**
  * Add product to cart – throws LOGIN_REQUIRED if not logged in
+ * Now accepts and passes color parameter to the API
  */
-export async function addToCart(product_id: number, quantity: number, price: number) {
+export async function addToCart(
+  product_id: number, 
+  quantity: number, 
+  price: number, 
+  color: string = 'default' // Add color parameter with default
+) {
   const token = typeof window !== "undefined" ? localStorage.getItem("customerToken") : null;
   if (!token) throw new Error("LOGIN_REQUIRED");
 
@@ -79,9 +85,11 @@ export async function addToCart(product_id: number, quantity: number, price: num
   if (price === undefined || price === null || Number.isNaN(Number(price))) {
     throw new Error("Price is required");
   }
+  // Color is optional but we'll pass it if provided
 
   try {
-    const data = await customerApi.cart.add(product_id, quantity, price);
+    // Pass color to the API call - your customerApi.cart.add already accepts it
+    const data = await customerApi.cart.add(product_id, quantity, price, color);
     emitCartUpdated();
     return data;
   } catch (err: any) {

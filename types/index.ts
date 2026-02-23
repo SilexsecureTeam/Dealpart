@@ -1,11 +1,13 @@
 // types/index.ts
+
+// ---------- User Types ----------
 export interface User {
   id: number;
   name: string;
   email: string;
   phone: string;
   email_verified_at: string | null;
-  role: 'user' | 'admin' | 'accountant' | 'manager'; // extend as needed
+  role: 'user' | 'admin' | 'accountant' | 'manager';
   created_at: string;
   updated_at: string;
   expires_at: string | null;
@@ -19,6 +21,7 @@ export interface User {
   bio: string | null;
 }
 
+// ---------- Category Types ----------
 export interface Category {
   id: number;
   name: string;
@@ -40,11 +43,13 @@ export interface Subcategory {
   updated_at: string;
 }
 
+// ---------- Product Types ----------
 export interface Product {
   id: number;
   name: string;
   description: string;
   sales_price_inc_tax: string | number;
+    sale_price_inc_tax?: number | string;
   images?: string[];
   colours?: string[];
   customize?: boolean;
@@ -59,16 +64,16 @@ export interface Product {
   cost_price?: number;
   measure?: string;
   unit_of_sale?: string;
-    orders?: number; 
-price?: number;
-sale_price?: number | null;
-rating?: number;
-stock_status?: 'in_stock' | 'low_stock' | 'out_of_stock';
-stock_quantity?: number;
-is_featured?: boolean;
-is_hot?: boolean;
-short_description?: string;
-image?: string; 
+  orders?: number; 
+  price?: number;
+  sale_price?: number | null;
+  rating?: number;
+  stock_status?: 'in_stock' | 'low_stock' | 'out_of_stock';
+  stock_quantity?: number;
+  is_featured?: boolean;
+  is_hot?: boolean;
+  short_description?: string;
+  image?: string; 
   slug?: string;
 }
 
@@ -129,17 +134,8 @@ export interface Staff {
   updated_at: string;
 }
 
+// ---------- Cart Types ----------
 export interface CartItem {
-  id: number;
-  product_id: number;
-  product?: Product;
-  quantity: number;
-  price: number;
-  color?: string;
-  customizations?: any[];
-}
-
-export interface OrderItem {
   id: number;
   product_id: number;
   product?: Product;
@@ -158,8 +154,51 @@ export interface Cart {
   discount: number;
 }
 
+// ---------- Order Types (Customer) ----------
+export interface CustomerOrder {
+  id: number;
+  user_id: number;
+  session_id: string | null;
+  order_reference: string;
+  subtotal: number;
+  delivery_fee: string;
+  total: number;
+  coupon_code: string | null;
+  discount_amount: number;
+  tax_rate: string;
+  tax_amount: number;
+  shipping_address: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  items: CustomerOrderItem[];
+}
+
+export interface CustomerOrderItem {
+  id: number;
+  order_id: number;
+  product_id: number;
+  customization_id: number | null;
+  color: string | null;
+  quantity: number;
+  price: string;
+  created_at: string;
+  updated_at: string;
+  product: {
+    id: number;
+    name: string;
+    images?: Array<{ id: number; path: string }>;
+    image_urls?: Array<{ id: number; path: string; url: string }>;
+  };
+  customization: any | null;
+}
+
+// ---------- Order Types (Admin) ----------
 export interface Order {
-  id: string; // e.g. SAB-XXXXXX
+  id: string;
   user_id: number;
   user?: User;
   items: OrderItem[];
@@ -176,20 +215,28 @@ export interface Order {
   updated_at: string;
 }
 
-// types/index.ts
+export interface OrderItem {
+  id: number;
+  product_id: number;
+  product?: Product;
+  quantity: number;
+  price: number;
+  color?: string;
+  customizations?: any[];
+}
+
 export interface OrderListItem {
   id: string | number;
   order_id: string;
+  order_reference: string;
   product_name: string;
   product_image?: string;
   date: string;
   price: number;
   customer_name?: string;
   customer_email?: string;
-  // Required fields for the order management page
   payment_status: 'Paid' | 'Unpaid' | 'Pending' | 'Refunded';
   order_status: 'Delivered' | 'Shipped' | 'Pending' | 'Canceled' | 'Processing';
-  // Optional fields
   customer?: {
     name: string;
     email: string;
@@ -214,6 +261,83 @@ export interface OrderListItem {
   updated_at?: string;
 }
 
+export interface OrdersResponse {
+  orders: Order[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface OrderStats {
+  totalOrders: number;
+  totalOrdersChange: string;
+  newOrders: number;
+  newOrdersChange: string;
+  completedOrders: number;
+  completedPercent: string;
+  canceledOrders: number;
+  canceledChange: string;
+}
+
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Canceled' | 'Cancelled';
+export type PaymentStatus = 'Paid' | 'Unpaid' | 'Pending';
+
+// ---------- Checkout Types ----------
+export interface CheckoutPayload {
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  shipping_address: string;
+  delivery_fee: number;
+  coupon_code?: string | null;
+  tax_rate: number;
+}
+
+// In types/index.ts
+export interface CheckoutResponse {
+  message: string;
+  order: {
+    id: number;
+    user_id: number;
+    session_id: string | null;
+    order_reference: string;  // ✅ This is what
+    subtotal: number;
+    delivery_fee: string;
+    total: number;
+    coupon_code: string | null;
+    discount_amount: number;
+    tax_rate: string;
+    tax_amount: number;
+    shipping_address: string;
+    customer_name: string;
+    customer_email: string;
+    customer_phone: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    items: Array<{
+      id: number;
+      order_id: number;
+      product_id: number;
+      customization_id: null;
+      color: string;
+      quantity: number;
+      price: string;
+      created_at: string;
+      updated_at: string;
+      product: any;
+    }>;
+  };
+  authorization_url?: string; 
+}
+
+export interface VerifyPaymentResponse {
+  status: boolean;
+  message: string;
+  order?: CustomerOrder;
+}
+
+// ---------- Coupon Types ----------
 export interface Coupon {
   id: number;
   promotion_name: string;
@@ -230,6 +354,112 @@ export interface Coupon {
   updated_at: string;
 }
 
+// ---------- Wishlist Types ----------
+export interface WishlistItem {
+  id: number;
+  product_id: number;
+  product: Product;
+  created_at: string;
+}
+
+export interface WishlistResponse {
+  data?: WishlistItem[];
+  wishlist?: WishlistItem[];
+}
+
+// ---------- Customer Types (Admin) ----------
+export type CustomerStatus = 'Active' | 'Inactive' | 'VIP';
+
+export interface AdminCustomer {
+  id: string;
+  user_id?: number;
+  name: string;
+  email: string;
+  phone: string;
+  orders_count: number;
+  total_spent: number;
+  status: CustomerStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerStats {
+  totalCustomers: number;
+  newCustomers: number;
+  visitors: number;
+  activeCustomers: number;
+  repeatCustomers: number;
+  shopVisitors: number;
+  conversionRate: number;
+  totalCustomersChange: string;
+  newCustomersChange: string;
+  visitorsChange: string;
+}
+
+export interface CustomersResponse {
+  customers: AdminCustomer[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CustomerOverview {
+  weeklyData: { day: string; visitors: number }[];
+  stats: CustomerStats;
+}
+
+export interface CustomerDetails extends AdminCustomer {
+  avatar?: string | null;
+  address?: string;
+  registration?: string;
+  lastPurchase?: string;
+  totalOrders?: number;
+  completedOrders?: number;
+  canceledOrders?: number;
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  linkedin?: string;
+}
+
+// ---------- Transaction Types ----------
+export interface Transaction {
+  id: string;
+  customer: string;
+  date: string;
+  status: 'Paid' | 'Pending' | 'Canceled';
+  amount: number;
+}
+
+export interface AdminTransaction {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  date: string;
+  total: number;
+  payment_method: string;
+  status: 'Complete' | 'Pending' | 'Canceled';
+}
+
+export interface AdminTransactionsResponse {
+  transactions: AdminTransaction[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface TransactionStats {
+  totalRevenue: number;
+  completedCount: number;
+  pendingCount: number;
+  failedCount: number;
+  totalRevenueChange: string;
+  completedChange: string;
+  pendingPercent: string;
+  failedPercent: string;
+}
+
+// ---------- CMS Types ----------
 export interface HeroSlide {
   id: number;
   title: string;
@@ -273,6 +503,7 @@ export interface AboutUs {
   updated_at: string;
 }
 
+// ---------- Delivery & Tax Types ----------
 export interface DeliveryFee {
   id: number;
   state_name: string;
@@ -292,13 +523,7 @@ export interface Tax {
   updated_at: string;
 }
 
-export interface WishlistItem {
-  id: number;
-  product_id: number;
-  product: Product;
-  created_at: string;
-}
-
+// ---------- API Response Types ----------
 export interface ApiResponse<T> {
   message?: string;
   data?: T;
@@ -316,185 +541,3 @@ export interface PaginatedResponse<T> {
   total: number;
 }
 
-
-export interface Transaction {
-  id: string;
-  customer: string;
-  date: string;
-  status: 'Paid' | 'Pending' | 'Canceled';
-  amount: number;
-}
-
-export interface AdminTransaction {
-  id: string;
-  customer_id: string;
-  customer_name: string;
-  date: string;
-  total: number;
-  payment_method: string;
-  status: 'Complete' | 'Pending' | 'Canceled';
-}
-
-export interface AdminTransactionsResponse {
-  transactions: AdminTransaction[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface TransactionStats {
-  totalRevenue: number;
-  completedCount: number;
-  pendingCount: number;
-  failedCount: number;
-  totalRevenueChange: string;
-  completedChange: string;
-  pendingPercent: string;
-  failedPercent: string;
-}
-
-export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Canceled' | 'Cancelled';
-export type PaymentStatus = 'Paid' | 'Unpaid' | 'Pending';
-
-// types/index.ts
-export interface OrderListItem {
-  id: string | number;
-  order_id: string;
-  product_name: string;
-  product_image?: string;
-  date: string;
-  price: number;
-  customer_name?: string;
-  customer_email?: string;
-}
-
-export interface OrderStats {
-  totalOrders: number;
-  totalOrdersChange: string;
-  newOrders: number;
-  newOrdersChange: string;
-  completedOrders: number;
-  completedPercent: string;
-  canceledOrders: number;
-  canceledChange: string;
-}
-
-export interface OrdersResponse {
-  orders: Order[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-
-
-export type CustomerStatus = 'Active' | 'Inactive' | 'VIP';
-
-export interface AdminCustomer {
-  id: string;          // e.g. "CUST001"
-  user_id?: number;    // actual user ID from API
-  name: string;
-  email: string;
-  phone: string;
-  orders_count: number;   // total orders placed
-  total_spent: number;    // lifetime spend
-  status: CustomerStatus;
-  created_at: string;
-  updated_at: string;
-  
-}
-
-export interface CustomerStats {
-  totalCustomers: number;
-  newCustomers: number;
-  visitors: number;
-  activeCustomers: number;
-  repeatCustomers: number;
-  shopVisitors: number;
-  conversionRate: number;
-  totalCustomersChange: string;  // e.g. "↑ 14.4%"
-  newCustomersChange: string;    // e.g. "↑ 20%"
-  visitorsChange: string;        // e.g. "↑ 20%"
-}
-
-export interface CustomersResponse {
-  customers: AdminCustomer[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface CustomerOverview {
-  weeklyData: { day: string; visitors: number }[];
-  stats: CustomerStats;
-}
-
-export interface CustomerDetails extends AdminCustomer {
-  avatar?: string | null;
-  address?: string;
-  registration?: string;
-  lastPurchase?: string;
-  totalOrders?: number;
-  completedOrders?: number;
-  canceledOrders?: number;
-  facebook?: string;
-  twitter?: string;
-  instagram?: string;
-  linkedin?: string;
-}
-
-export interface CustomerOrder {
-  id: string;
-  date: string;
-  total: number;
-  status: 'Completed' | 'Pending' | 'Cancelled';
-}
-
-// ---------- Checkout ----------
-export interface CheckoutPayload {
-  shipping_address: string;
-  delivery_fee?: number;
-  coupon_code?: string;
-  tax_rate?: number;
-}
-
-export interface CheckoutResponse {
-  order_id: string;
-  payment_reference: string;
-  total: number;
-  authorization_url?: string; // Paystack URL
-  access_code?: string;
-  reference?: string;
-}
-
-export interface VerifyPaymentResponse {
-  status: boolean;
-  message: string;
-  order?: Order;
-}
-
-export interface Coupon {
-  id: number;
-  code: string;
-  type: 'percent' | 'fixed';
-  value: number;
-  expires_at: string;
-  is_active: boolean;
-}
-
-export interface Category {
-  id: number;
-  name: string;
-  description: string;
-  slug: string;
-  image: string;
-  created_at: string;
-  updated_at: string;
-  products?: Product[];
-  
-}
-
-export interface WishlistResponse {
-  data?: WishlistItem[];
-  wishlist?: WishlistItem[];
-}

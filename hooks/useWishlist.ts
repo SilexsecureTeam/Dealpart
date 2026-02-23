@@ -67,8 +67,18 @@ export const useRemoveFromWishlist = () => {
   return useMutation({
     mutationFn: async (wishlistItemId: number) => {
       console.log('Removing wishlist item with ID:', wishlistItemId);
-      const response = await customerApi.wishlist.remove(wishlistItemId);
-      return response;
+      try {
+        const response = await customerApi.wishlist.remove(wishlistItemId);
+        return response;
+      } catch (error: any) {
+        // If item not found (404), consider it already removed - DON'T rethrow
+        if (error?.message?.includes('not found') || error?.message?.includes('404')) {
+          console.log('Item already removed from wishlist (404) - treating as success');
+          return { success: true, id: wishlistItemId, alreadyRemoved: true };
+        }
+        // Only rethrow non-404 errors
+        throw error;
+      }
     },
     onMutate: async (wishlistItemId) => {
       // Cancel outgoing refetches
@@ -86,10 +96,11 @@ export const useRemoveFromWishlist = () => {
       return { previousWishlist };
     },
     onSuccess: (data, variables) => {
-      console.log('Successfully removed item:', variables);
+      console.log('Successfully removed item:', variables, data);
       // No need to invalidate here since we already did optimistic update
     },
     onError: (error, variables, context) => {
+      // This will now only run for non-404 errors
       console.error('Remove from wishlist error:', error, 'for item:', variables);
       
       // Rollback on error

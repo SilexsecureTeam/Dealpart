@@ -1,6 +1,6 @@
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import {
   Search,
@@ -14,7 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useAuth } from '@/contexts/AuthContext'; // Add this
+import { useAuth } from '@/contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 // ---------- React Query Hooks ----------
 import { useTransactionStats } from '@/hooks/useTransactionStats';
@@ -28,6 +29,19 @@ type FilterType = 'all' | 'completed' | 'pending' | 'canceled';
 const formatCurrency = (amount: number | undefined | null) => {
   if (amount === undefined || amount === null) return '₦0';
   return `₦${amount.toLocaleString()}`;
+};
+
+// Helper to get payment method abbreviation
+const getMethodAbbr = (method: string) => {
+  const methods: Record<string, string> = {
+    'card': 'CC',
+    'credit_card': 'CC',
+    'paypal': 'PayPal',
+    'bank_transfer': 'Bank',
+    'bank': 'Bank',
+    'pay_on_delivery': 'COD'
+  };
+  return methods[method?.toLowerCase()] || method?.slice(0, 3).toUpperCase() || '—';
 };
 
 // Helper to resolve avatar URL
@@ -78,8 +92,9 @@ const TableRowSkeleton = () => (
 // ---------- Main Page ----------
 export default function TransactionPage() {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth(); // Add this
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   // ---------- Local State ----------
   const [filter, setFilter] = useState<FilterType>('all');
@@ -132,26 +147,45 @@ export default function TransactionPage() {
   const total = transactionsData?.total || 0;
   const totalPages = Math.ceil(total / itemsPerPage);
 
+  // Calculate payment method stats from transactions
+  const paymentMethodStats = useMemo(() => {
+    const stats = {
+      totalTransactions: transactions.length,
+      totalRevenue: transactions.reduce((sum, tx) => sum + (tx.total || 0), 0),
+      cardCount: 0,
+      bankCount: 0,
+      paypalCount: 0,
+      codCount: 0,
+    };
+    
+    transactions.forEach((tx: any) => {
+      const method = tx.payment_method?.toLowerCase() || '';
+      if (method.includes('card') || method === 'cc') {
+        stats.cardCount++;
+      } else if (method.includes('bank')) {
+        stats.bankCount++;
+      } else if (method.includes('paypal')) {
+        stats.paypalCount++;
+      } else if (method.includes('cod') || method.includes('delivery')) {
+        stats.codCount++;
+      }
+    });
+    
+    return stats;
+  }, [transactions]);
+
   // ---------- Error Handling ----------
   useEffect(() => {
     if (statsError) {
-      setMessage({ type: 'error', text: 'Failed to load transaction statistics' });
+      toast.error('Failed to load transaction statistics');
     }
   }, [statsError]);
 
   useEffect(() => {
     if (transactionsError) {
-      setMessage({ type: 'error', text: 'Failed to load transactions' });
+      toast.error('Failed to load transactions');
     }
   }, [transactionsError]);
-
-  // ---------- Auto-dismiss Toast ----------
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
 
   // ---------- Mount ----------
   useEffect(() => {
@@ -243,22 +277,6 @@ export default function TransactionPage() {
       )}
 
       <main className="p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
-        {/* Toast Message */}
-        {message && (
-          <div
-            className={`mb-6 rounded-xl px-4 py-3 text-sm border flex justify-between items-center ${
-              message.type === 'success'
-                ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300'
-                : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
-            }`}
-          >
-            <span>{message.text}</span>
-            <button onClick={() => setMessage(null)} className="p-1">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         {/* Stats + Payment Method Card */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
           {/* Stats Cards */}
@@ -351,7 +369,7 @@ export default function TransactionPage() {
             )}
           </div>
 
-          {/* Payment Method Card – STATIC (unchanged) */}
+          {/* Payment Method Card – DYNAMIC from transactions */}
           <div className="lg:col-span-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm h-full flex flex-col">
               <div className="flex justify-between items-start mb-6">
@@ -376,12 +394,30 @@ export default function TransactionPage() {
                       </p>
                     </div>
                     <div className="space-y-2 text-sm">
-                      <p><span className="text-gray-600 dark:text-gray-300">Transactions:</span> 1,250</p>
-                      <p><span className="text-gray-600 dark:text-gray-300">Revenue:</span> ₦500,000</p>
+                      <p className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">Transactions:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {paymentMethodStats.totalTransactions.toLocaleString()}
+                        </span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">Revenue:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(paymentMethodStats.totalRevenue)}
+                        </span>
+                      </p>
+                      <div className="pt-2 text-xs text-gray-500">
+                        <p> Card: {paymentMethodStats.cardCount}</p>
+                        <p> Bank: {paymentMethodStats.bankCount}</p>
+                        {paymentMethodStats.paypalCount > 0 && <p> PayPal: {paymentMethodStats.paypalCount}</p>}
+                      </div>
                     </div>
                   
-                  <button className="mt-4 self-start text-[#4EA674] hover:underline text-sm font-medium">
-                    View Transactions
+                  <button 
+                    onClick={() => router.push('/admin/transactions')}
+                    className="mt-4 self-start text-[#4EA674] hover:underline text-sm font-medium"
+                  >
+                    View All Transactions
                   </button>
                 </div>
                </div>
@@ -512,7 +548,9 @@ export default function TransactionPage() {
                         <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white font-medium">
                           {formatCurrency(tx.total)}
                         </td>
-                        <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white">{tx.payment_method}</td>
+                        <td className="px-4 sm:px-6 py-5 text-gray-900 dark:text-white">
+                          {getMethodAbbr(tx.payment_method)}
+                        </td>
                         <td className="px-4 sm:px-6 py-5">
                           <span className={`inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${
                             tx.status === 'Complete' ? 'bg-[#EAF8E7] text-[#4EA674]' :
@@ -528,7 +566,10 @@ export default function TransactionPage() {
                           </span>
                         </td>
                         <td className="px-4 sm:px-6 py-5">
-                          <button className="text-[#4EA674] hover:underline text-xs sm:text-sm font-medium">
+                          <button 
+                            onClick={() => router.push(`/admin/transactions/${tx.id}`)}
+                            className="text-[#4EA674] hover:underline text-xs sm:text-sm font-medium"
+                          >
                             View Details
                           </button>
                         </td>

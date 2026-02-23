@@ -672,6 +672,13 @@ export default function CategoriesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Discover</h2>
           <div className="flex items-center gap-3">
+            {/* NEW: Manage Subcategories Button */}
+            <button
+              onClick={() => router.push('/admin/subcategories')}
+              className="px-4 py-2.5 border border-[#4EA674] text-[#4EA674] rounded-full text-sm font-medium flex items-center gap-2 hover:bg-[#4EA674] hover:text-white transition-colors"
+            >
+              Manage Subcategories
+            </button>
             <button
               onClick={() => router.push('/admin/product/add')}
               className="px-4 py-2.5 bg-[#4EA674] text-white rounded-full text-sm font-medium flex items-center gap-2 hover:bg-[#3D8B59] transition-colors"

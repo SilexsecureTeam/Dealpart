@@ -25,7 +25,11 @@ import { OrderListItem, OrderStats } from '@/types';
 
 type FilterType = 'all' | 'completed' | 'pending' | 'canceled';
 
-const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+
+const formatCurrency = (amount: number | undefined | null) => {
+  if (amount === undefined || amount === null) return '₦0';
+  return `₦${amount.toLocaleString()}`;
+};
 
 const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
   if (!pathOrUrl) return '/man.png';
@@ -97,6 +101,12 @@ export default function OrderManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [updateOrderId, setUpdateOrderId] = useState<string | null>(null);
+  const [newStatus, setNewStatus] = useState<'Processing' | 'Shipped' | 'Delivered' | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -108,6 +118,88 @@ export default function OrderManagementPage() {
     const img = e.currentTarget;
     if (img.src === '/man.png') return;
     img.src = '/man.png';
+  };
+
+  const updateOrderStatus = async () => {
+    if (!updateOrderId || !newStatus) return;
+
+    setIsUpdatingStatus(true);
+    try {
+      const response = await fetch(
+        `https://admin.bezalelsolar.com/api/admin/orders/status/${updateOrderId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('adminToken') || ''}`,
+          },
+          body: JSON.stringify({ 
+            _method: 'patch',
+            order_status: newStatus 
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        console.error('Validation Errors:', errorData?.errors);
+        throw new Error(errorData?.message || 'Failed to update order status');
+      }
+
+      setMessage({
+        type: 'success',
+        text: `Order status updated to ${newStatus}`,
+      });
+
+      // Reset the form
+      setUpdateOrderId(null);
+      setNewStatus(null);
+
+      // Refetch orders to update the list
+      window.location.reload();
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to update order status',
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleStatusClick = (orderId: string, currentStatus: string) => {
+    setUpdateOrderId(orderId);
+    setNewStatus(null); // Reset the new status selection
+  };
+
+  const fetchOrderDetails = async (orderReference: string) => {
+    setIsLoadingDetails(true);
+    try {
+      const response = await fetch(
+        `https://admin.bezalelsolar.com/api/admin/orders/${orderReference}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('adminToken') || ''}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch order details');
+      }
+
+      const data = await response.json();
+      setOrderDetails(data.order);
+      setViewOrderId(orderReference);
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: 'Failed to load order details',
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
   };
 
   useEffect(() => {
@@ -422,14 +514,18 @@ export default function OrderManagementPage() {
                   orders.map((order, i) => {
                     const rowNumber = (page - 1) * itemsPerPage + i + 1;
                     return (
-                      <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                      <tr 
+                        key={order.id} 
+                        onClick={() => fetchOrderDetails(order.order_reference)}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer"
+                      >
                         <td className="px-6 py-5 font-medium text-gray-900 dark:text-white">{rowNumber}</td>
-                        <td className="px-6 py-5 font-medium text-gray-900 dark:text-white">#{order.order_id}</td>
+                        <td className="px-6 py-5 font-medium text-gray-900 dark:text-white">#{order.order_reference}</td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-3">
                             <Image
                               src={order.product_image || '/solarpanel.png'}
-                              alt={order.product_name}
+                              alt={order.product_name || 'Product image'}
                               width={40}
                               height={40}
                               className="rounded-lg object-cover"
@@ -452,8 +548,12 @@ export default function OrderManagementPage() {
                           </span>
                         </td>
                         <td className="px-6 py-5">
-                          <span
-                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusClick(String(order.id), order.order_status);
+                            }}
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer hover:opacity-80 transition-opacity ${
                               order.order_status === 'Delivered' || order.order_status === 'Shipped'
                                 ? 'bg-[#7aeb60] text-[#05130b]'
                                 : order.order_status === 'Pending'
@@ -463,7 +563,7 @@ export default function OrderManagementPage() {
                           >
                             <Truck className="w-4 h-4" />
                             {order.order_status}
-                          </span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -484,25 +584,30 @@ export default function OrderManagementPage() {
               orders.map((order, i) => (
                 <div
                   key={order.id}
-                  className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-4 border border-gray-200 dark:border-gray-700"
+                  onClick={() => fetchOrderDetails(order.order_reference)}
+                  className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3">
                       <Image
                         src={order.product_image || '/solarpanel.png'}
-                        alt={order.product_name}
+                        alt={order.product_name || 'Product image'}
                         width={48}
                         height={48}
                         className="rounded-lg object-cover"
                         unoptimized
                       />
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-white">#{order.order_id}</p>
+                        <p className="font-medium text-gray-900 dark:text-white">#{order.order_reference}</p>
                         <p className="text-sm text-gray-600 dark:text-gray-300">{order.product_name}</p>
                       </div>
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStatusClick(String(order.id), order.order_status);
+                      }}
+                      className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${
                         order.order_status === 'Delivered' || order.order_status === 'Shipped'
                           ? 'bg-[#EAF8E7] text-[#4EA674]'
                           : order.order_status === 'Pending'
@@ -511,7 +616,7 @@ export default function OrderManagementPage() {
                       }`}
                     >
                       {order.order_status}
-                    </span>
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -589,6 +694,240 @@ export default function OrderManagementPage() {
           )}
         </div>
       </main>
+
+      {/* Status Update Modal */}
+      {updateOrderId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                Update Order Status
+              </h3>
+              <button
+                onClick={() => {
+                  setUpdateOrderId(null);
+                  setNewStatus(null);
+                }}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Select new status</p>
+
+            <div className="space-y-3 mb-6">
+              {['Processing', 'Shipped', 'Delivered'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setNewStatus(status as 'Processing' | 'Shipped' | 'Delivered')}
+                  className={`w-full px-4 py-3 rounded-lg font-medium transition-colors text-left ${
+                    newStatus === status
+                      ? 'bg-[#4EA674] text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setUpdateOrderId(null);
+                  setNewStatus(null);
+                }}
+                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={updateOrderStatus}
+                disabled={!newStatus || isUpdatingStatus}
+                className="flex-1 px-4 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {isUpdatingStatus ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Status'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Details Modal */}
+      {viewOrderId && orderDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl shadow-lg my-8">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Order {orderDetails.order_reference}
+              </h3>
+              <button
+                onClick={() => {
+                  setViewOrderId(null);
+                  setOrderDetails(null);
+                }}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+              {/* Order Status and Payment */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Order Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    orderDetails.order_status === 'Delivered' || orderDetails.order_status === 'Shipped'
+                      ? 'bg-[#7aeb60] text-[#05130b]'
+                      : orderDetails.order_status === 'Processing'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {orderDetails.order_status}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Payment Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    orderDetails.status === 'paid'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {orderDetails.status?.charAt(0).toUpperCase() + orderDetails.status?.slice(1)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Payment Method</p>
+                  <p className="font-medium text-gray-900 dark:text-white capitalize">{orderDetails.payment_method}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Order Date</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{new Date(orderDetails.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              {/* Customer Information */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Customer Information</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Name</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{orderDetails.customer_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Email</p>
+                    <p className="font-medium text-gray-900 dark:text-white break-all">{orderDetails.customer_email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Phone</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{orderDetails.customer_phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Shipping Address</p>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm">{orderDetails.shipping_address}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Items */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Items</h4>
+                <div className="space-y-4">
+                  {orderDetails.items?.map((item: any) => (
+                    <div key={item.id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-700/40 rounded-lg">
+                      {item.product?.image_urls?.[0]?.url && (
+                        <img
+                          src={item.product.image_urls[0].url}
+                          alt={item.product.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white mb-1">{item.product?.name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          Qty: <span className="font-medium">{item.quantity}</span>
+                        </p>
+                        {item.color && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Color: <span className="font-medium capitalize">{item.color}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                          ₦{parseFloat(item.price).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Order Summary</h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <p className="text-gray-600 dark:text-gray-400">Subtotal</p>
+                    <p className="font-medium text-gray-900 dark:text-white">₦{parseFloat(orderDetails.subtotal).toLocaleString()}</p>
+                  </div>
+                  {parseFloat(orderDetails.discount_amount) > 0 && (
+                    <div className="flex justify-between">
+                      <p className="text-gray-600 dark:text-gray-400">Discount</p>
+                      <p className="font-medium text-red-600">-₦{parseFloat(orderDetails.discount_amount).toLocaleString()}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <p className="text-gray-600 dark:text-gray-400">Tax ({orderDetails.tax_rate}%)</p>
+                    <p className="font-medium text-gray-900 dark:text-white">₦{parseFloat(orderDetails.tax_amount).toLocaleString()}</p>
+                  </div>
+                  {parseFloat(orderDetails.delivery_fee) > 0 && (
+                    <div className="flex justify-between">
+                      <p className="text-gray-600 dark:text-gray-400">Delivery Fee</p>
+                      <p className="font-medium text-gray-900 dark:text-white">₦{parseFloat(orderDetails.delivery_fee).toLocaleString()}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
+                    <p className="font-bold text-gray-900 dark:text-white">Total</p>
+                    <p className="text-2xl font-bold text-[#4EA674]">₦{parseFloat(orderDetails.total).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setViewOrderId(null);
+                  setOrderDetails(null);
+                }}
+                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setViewOrderId(null);
+                  setOrderDetails(null);
+                  setUpdateOrderId(String(orderDetails.id));
+                }}
+                className="flex-1 px-4 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition-colors"
+              >
+                Update Status
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

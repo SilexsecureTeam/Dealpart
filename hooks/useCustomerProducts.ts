@@ -22,6 +22,17 @@ export interface ProductsResponse {
   total?: number;
 }
 
+// Add params type
+export interface CustomerProductsParams {
+  search?: string;
+  category?: string;
+  brand?: string;
+  min_price?: number;
+  max_price?: number;
+  page?: number;
+  limit?: number;
+}
+
 // ---------- Helper: create slug from product name ----------
 export function createSlug(name: string): string {
   return name
@@ -30,12 +41,22 @@ export function createSlug(name: string): string {
     .replace(/\s+/g, '-');
 }
 
-// ---------- Fetch all products (customer/public) ----------
-export const useCustomerProducts = () => {
+// ---------- Fetch all products (customer/public) with optional params ----------
+export const useCustomerProducts = (params?: CustomerProductsParams) => {
   return useQuery({
-    queryKey: ['customer', 'products'],
+    queryKey: ['customer', 'products', params], // Include params in queryKey for caching
     queryFn: async () => {
-      const response = await customerApi.products.list();
+      // Build query string from params
+      const queryParams = new URLSearchParams();
+      if (params?.search) queryParams.append('search', params.search);
+      if (params?.category) queryParams.append('category', params.category);
+      if (params?.brand) queryParams.append('brand', params.brand);
+      if (params?.min_price) queryParams.append('min_price', params.min_price.toString());
+      if (params?.max_price) queryParams.append('max_price', params.max_price.toString());
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      
+      const response = await customerApi.products.list(queryParams);
       
       // ✅ Handle BOTH array response AND object response
       let rawProducts: any[] = [];

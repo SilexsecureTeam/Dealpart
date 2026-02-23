@@ -32,19 +32,20 @@ function normalizeCartItems(items: any[]): CartItem[] {
   }));
 }
 
-// ---------- Fetch cart ----------
 export const useCart = () => {
   return useQuery({
     queryKey: ['customer', 'cart'],
     queryFn: async () => {
-      const items = await getCart();
+      const response = await customerApi.cart.get();
+      // Handle different response structures
+      const cartData = response.data || response;
+      const items = Array.isArray(cartData) ? cartData : cartData.items || [];
       return normalizeCartItems(items);
     },
-    staleTime: 0, // Always refetch when invalidated
+    staleTime: 0,
     retry: 1,
   });
 };
-
 // ---------- Update cart item quantity ----------
 export const useUpdateCartItem = () => {
   const queryClient = useQueryClient();
@@ -70,19 +71,22 @@ export const useRemoveCartItem = () => {
   });
 };
 
-// ---------- Add to cart ----------
 export const useAddToCart = () => {
   const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: ({ product_id, quantity, price }: { product_id: number; quantity: number; price: number }) =>
-      customerApi.cart.add(product_id, quantity, price),
+    mutationFn: ({ product_id, quantity, price, color }: { 
+      product_id: number; 
+      quantity: number; 
+      price: number;
+      color?: string; 
+    }) => customerApi.cart.add(product_id, quantity, price, color || 'default'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer', 'cart'] });
       emitCartUpdated();
     },
   });
 };
-
 // ---------- Utility: calculate cart summary ----------
 export const useCartSummary = (items: CartItem[] = []) => {
   const { count, total } = calcCartSummary(items);

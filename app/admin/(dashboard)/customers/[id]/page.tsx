@@ -22,17 +22,44 @@ import {
   X,
   Sun,
   Moon,
+  ArrowLeft,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useAuth } from '@/contexts/AuthContext'; // Add this
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
-// ---------- React Query Hooks ----------
-import { 
-  useAdminCustomerDetails, 
-  useAdminCustomerOrders, 
-  useDeleteCustomerOrder 
-} from '@/hooks/useAdminCustomers';
-import { CustomerDetails, CustomerOrder } from '@/types';
+// ---------- Types ----------
+interface CustomerDetails {
+  id: number;
+  user_id?: number;
+  name: string;
+  email: string;
+  phone?: string;
+  avatar?: string | null;
+  address?: string;
+  status?: 'Active' | 'VIP' | 'Inactive';
+  totalOrders?: number;
+  completedOrders?: number;
+  canceledOrders?: number;
+  totalSpent?: number;
+  registration?: string;
+  lastPurchase?: string;
+  created_at?: string;
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  linkedin?: string;
+}
+
+interface CustomerOrder {
+  id: string;
+  date: string;
+  total: number;
+  status: 'Completed' | 'Pending' | 'Cancelled';
+}
 
 // ---------- Helpers ----------
 const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
@@ -44,29 +71,23 @@ const formatDate = (dateString: string) => {
 // Helper to resolve avatar URL
 const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
   if (!pathOrUrl) return '/man.png';
-  
   const raw = String(pathOrUrl).trim();
-  
-  // If it's already a full URL, return as is
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  
-  // Extract just the filename
   const filename = raw.split('/').pop() || raw;
-  
-  // Return the correct storage path
   return `https://admin.bezalelsolar.com/storage/avatars/${filename}`;
 };
 
 // ---------- Main Component ----------
 export default function CustomerDetailsPage() {
   const params = useParams();
+  const router = useRouter();
   const customerId = params.id as string;
   const { theme, setTheme } = useTheme(); 
   const { user } = useAuth(); 
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
 
   // ---------- Local State ----------
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [orderPage, setOrderPage] = useState(1);
   const ordersPerPage = 5;
 
@@ -82,21 +103,118 @@ export default function CustomerDetailsPage() {
     img.src = '/man.png';
   };
 
-  // ---------- React Query ----------
+  // ---------- Fetch Customer Details ----------
   const {
     data: customer,
     isLoading: customerLoading,
     error: customerError,
-  } = useAdminCustomerDetails(customerId);
+    refetch: refetchCustomer,
+  } = useQuery({
+    queryKey: ['customer', customerId],
+    queryFn: async () => {
+      // Try multiple possible endpoints
+      const endpoints = [
+        `/admin/users/${customerId}`,
+        `/users/${customerId}`,
+        `/customers/${customerId}`,
+        `/admin/customers/${customerId}`,
+        `/api/admin/users/${customerId}`,
+      ];
+      
+      let lastError = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await api.get(endpoint);
+          if (response.data) {
+            // Handle different response structures
+            const customerData = response.data.data || response.data;
+            console.log('Customer data found at:', endpoint, customerData);
+            return customerData;
+          }
+        } catch (e) {
+          lastError = e;
+          // Continue to next endpoint
+        }
+      }
+      
+      throw new Error('Customer not found');
+    },
+    retry: 1,
+  });
 
+  // ---------- Fetch Customer Orders ----------
   const {
     data: orders = [],
     isLoading: ordersLoading,
     error: ordersError,
     refetch: refetchOrders,
-  } = useAdminCustomerOrders(customerId);
+  } = useQuery({
+    queryKey: ['customer-orders', customerId],
+    queryFn: async () => {
+      // Try multiple possible endpoints for orders
+      const endpoints = [
+        `/admin/users/${customerId}/orders`,
+        `/users/${customerId}/orders`,
+        `/customers/${customerId}/orders`,
+        `/admin/orders?user_id=${customerId}`,
+        `/api/orders?customer_id=${customerId}`,
+      ];
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await api.get(endpoint);
+          if (response.data) {
+            // Handle different response structures
+            let ordersData = response.data.data || response.data;
+            if (Array.isArray(ordersData)) {
+              return ordersData;
+            }
+            if (ordersData.orders && Array.isArray(ordersData.orders)) {
+              return ordersData.orders;
+            }
+          }
+        } catch (e) {
+          // Continue to next endpoint
+        }
+      }
+      
+      return []; // Return empty array if no orders found
+    },
+    enabled: !!customer, // Only fetch orders if customer exists
+  });
 
-  const deleteOrder = useDeleteCustomerOrder();
+  // ---------- Delete Order Mutation ----------
+  const deleteOrder = useMutation({
+    mutationFn: async (orderId: string) => {
+      // Try multiple possible delete endpoints
+      const endpoints = [
+        `/admin/orders/${orderId}`,
+        `/orders/${orderId}`,
+        `/api/orders/${orderId}`,
+      ];
+      
+      let lastError = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await api.delete(endpoint);
+          return response.data;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      
+      throw lastError || new Error('Failed to delete order');
+    },
+    onSuccess: (_, orderId) => {
+      queryClient.invalidateQueries({ queryKey: ['customer-orders', customerId] });
+      toast.success(`Order #${orderId} deleted successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to delete order');
+    },
+  });
 
   // ---------- Mount ----------
   useEffect(() => {
@@ -105,36 +223,16 @@ export default function CustomerDetailsPage() {
 
   // ---------- Error Handling ----------
   useEffect(() => {
-    if (customerError) setMessage({ type: 'error', text: 'Failed to load customer details' });
+    if (customerError) {
+      toast.error('Failed to load customer details');
+    }
   }, [customerError]);
 
   useEffect(() => {
-    if (ordersError) setMessage({ type: 'error', text: 'Failed to load orders' });
+    if (ordersError) {
+      toast.error('Failed to load orders');
+    }
   }, [ordersError]);
-
-  // ---------- Auto-dismiss Toast ----------
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
-  // ---------- Delete Order Handler ----------
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm(`Delete order #${orderId}? This cannot be undone.`)) return;
-
-    try {
-      await deleteOrder.mutateAsync(orderId, {
-        onSuccess: () => {
-          refetchOrders();
-          setMessage({ type: 'success', text: `Order #${orderId} deleted successfully` });
-        },
-      });
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Failed to delete order' });
-    }
-  };
 
   // ---------- Pagination ----------
   const totalPages = Math.ceil(orders.length / ordersPerPage);
@@ -142,6 +240,11 @@ export default function CustomerDetailsPage() {
     (orderPage - 1) * ordersPerPage,
     orderPage * ordersPerPage
   );
+
+  // Reset page when orders change
+  useEffect(() => {
+    setOrderPage(1);
+  }, [orders.length]);
 
   // ---------- Loading State ----------
   if (!mounted || customerLoading) {
@@ -154,8 +257,22 @@ export default function CustomerDetailsPage() {
 
   if (!customer && !customerLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center text-red-600">
-        Customer not found
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-600 text-2xl">!</span>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Customer Not Found</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            The customer you're looking for doesn't exist or you don't have permission to view it.
+          </p>
+          <button
+            onClick={() => router.push('/admin/customers')}
+            className="px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
+          >
+            Back to Customers
+          </button>
+        </div>
       </div>
     );
   }
@@ -164,7 +281,15 @@ export default function CustomerDetailsPage() {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between shadow-sm">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Customer Details</h1>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          </button>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Customer Details</h1>
+        </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="relative hidden md:block">
@@ -185,7 +310,7 @@ export default function CustomerDetailsPage() {
             <Settings className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
 
-          {/* Theme toggle - optional, add if you want it */}
+          {/* Theme toggle */}
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -211,32 +336,14 @@ export default function CustomerDetailsPage() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950">
-        {/* Toast Message */}
-        {message && (
-          <div
-            className={`mb-6 rounded-xl px-4 py-3 text-sm border flex justify-between items-center ${
-              message.type === 'success'
-                ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300'
-                : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
-            }`}
-          >
-            <span>{message.text}</span>
-            <button onClick={() => setMessage(null)} className="p-1">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Customer Details</h2>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Profile Card */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-gray-100 dark:ring-gray-700">
                   <Image
-                    src={customer?.avatar || '/man.png'}
+                    src={resolveAvatar(customer?.avatar)}
                     alt={customer?.name || 'Customer'}
                     width={80}
                     height={80}
@@ -252,7 +359,7 @@ export default function CustomerDetailsPage() {
                         ? 'bg-[#EAF8E7] text-[#4EA674]'
                         : customer?.status === 'VIP'
                         ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                     }`}
                   >
                     {customer?.status || 'Inactive'}
@@ -404,7 +511,7 @@ export default function CustomerDetailsPage() {
                                   <MessageSquare className="w-5 h-5" />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteOrder(order.id)}
+                                  onClick={() => deleteOrder.mutate(order.id)}
                                   disabled={deleteOrder.isPending}
                                   className="text-gray-500 hover:text-red-500 transition disabled:opacity-50"
                                 >
@@ -434,12 +541,14 @@ export default function CustomerDetailsPage() {
                       </button>
 
                       <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
-                        {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                           let pageNum = i + 1;
-                          if (totalPages > 3 && orderPage > 2) {
-                            if (i === 0) pageNum = orderPage - 1;
-                            else if (i === 1) pageNum = orderPage;
-                            else pageNum = orderPage + 1;
+                          if (totalPages > 5 && orderPage > 3) {
+                            if (i === 0) pageNum = 1;
+                            else if (i === 1) return <span key="dots1" className="px-2 py-1 text-gray-400">...</span>;
+                            else if (i === 3) return <span key="dots2" className="px-2 py-1 text-gray-400">...</span>;
+                            else if (i === 4) pageNum = totalPages;
+                            else pageNum = orderPage - 1 + (i - 1);
                           }
                           if (pageNum > totalPages || pageNum < 1) return null;
                           return (

@@ -122,6 +122,26 @@ export const api = {
       apiClient.delete(`/categories/${id}`),
   },
 
+
+  // Subcategories endpoints
+  subcategories: {
+    list: (params?: URLSearchParams) => 
+      apiClient.get(`/subcategories${params ? `?${params.toString()}` : ''}`),
+    detail: (id: string | number) => 
+      apiClient.get(`/subcategories/${id}`),
+    create: (data: FormData) => 
+      apiClient.post('/subcategories', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }),
+    update: (id: string | number, data: FormData) => {
+      data.append('_method', 'PATCH');
+      return apiClient.post(`/subcategories/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    delete: (id: string | number) => 
+      apiClient.delete(`/subcategories/${id}`),
+  },
   // Brands endpoints
   brands: {
     list: (params?: URLSearchParams) => 

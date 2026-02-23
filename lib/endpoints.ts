@@ -18,10 +18,16 @@ export const AdminEndpoints = {
   // Categories
   categories: `${API_BASE}/api/categories`,
   categoryDetail: (id: number | string) => `${API_BASE}/api/categories/${id}`,
+  subcategories: `${API_BASE}/api/subcategories`,
+  subcategoryDetail: (id: number | string) => `${API_BASE}/api/subcategories/${id}`,
   
   // Products
   products: `${API_BASE}/api/products`,
   productDetail: (id: number | string) => `${API_BASE}/api/products/${id}`,
+  tags: `${API_BASE}/api/tags`,
+  tagDetail: (id: number | string) => `${API_BASE}/api/tags/${id}`,
+  productMedia: (id: number | string) => `${API_BASE}/api/products/${id}/media`,
+  
   
   // Orders
   orders: `${API_BASE}/api/admin/orders`,
@@ -59,6 +65,7 @@ couponToggle: (id: number | string) => `${API_BASE}/api/admin/coupons/${id}/togg
   userDetail: (id: number | string) => `${API_BASE}/api/admin/users/${id}`,
 } as const;
 
+//customer side 
 export const CustomerEndpoints = {
   login: `${API_BASE}/api/login`,
   register: `${API_BASE}/api/register`,
@@ -73,11 +80,18 @@ brandDetail: (slug: string) => `${API_BASE}/api/brands/${slug}`,
   cartAdd: `${API_BASE}/api/cart/add`,
   cartUpdate: (id: number | string) => `${API_BASE}/api/cart/${id}`,
   cartRemove: (id: number | string) => `${API_BASE}/api/cart/${id}`,
+  cartMerge: `${API_BASE}/api/cart/merge`,
   checkout: `${API_BASE}/api/checkout`,
   verifyPayment: `${API_BASE}/api/verify-payment`,
   coupons: `${API_BASE}/api/coupons`,
   wishlist: `${API_BASE}/api/wishlist`,
   wishlistItem: (id: number | string) => `${API_BASE}/api/wishlist/${id}`,
+  orders: `${process.env.NEXT_PUBLIC_API_URL}/api/orders`,
+    orderDetail: (reference: string) => `${process.env.NEXT_PUBLIC_API_URL}/api/orders/${reference}`,
+     locations: `${API_BASE}/api/locations`,
+  states: `${API_BASE}/api/state`,
+  calculateDelivery: `${API_BASE}/api/delivery-fee`,
+  taxes: `${API_BASE}/api/taxes`,
 } as const;
 
 export const Endpoints = {

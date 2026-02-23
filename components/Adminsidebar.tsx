@@ -30,7 +30,7 @@ const productMenu = [
 
 const adminMenu = [
   { icon: UserCog, label: "Admin role", path: "/admin/admin-role" },
-  { icon: Shield, label: "Control Authority", path: "/admin/authority" },
+  { icon: Shield, label: "Control Authority", path: "/admin/control-authority" },
 ];
 
 // Helper to resolve avatar URL

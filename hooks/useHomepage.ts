@@ -41,42 +41,7 @@ export const fallbackProducts: Product[] = [
     rating: 5,
     stock_status: "in_stock",
   },
-  {
-    id: 2,
-    name: "Lithium LiFePO4 Battery 12V / 100Ah",
-    description: "Safe lithium battery",
-    sales_price_inc_tax: 40.99,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    price: 40.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "low_stock",
-  },
-  {
-    id: 3,
-    name: "Solar Motion Sensor Light (24W)",
-    description: "Smart motion-activated lighting",
-    sales_price_inc_tax: 119.99,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    price: 119.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "in_stock",
-  },
-  {
-    id: 4,
-    name: "MPPT Charge Controller 60A",
-    description: "Maximum power point tracking",
-    sales_price_inc_tax: 119.99,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    price: 119.99,
-    image: "/offer.jpg",
-    rating: 5,
-    stock_status: "in_stock",
-  },
+  // ... other fallback products
 ];
 
 export const fallbackNewArrivals: Product[] = [
@@ -95,51 +60,7 @@ export const fallbackNewArrivals: Product[] = [
     is_featured: true,
     is_hot: false,
   },
-  {
-    id: 102,
-    name: "Lithium LiFePO4 Battery 12V / 100Ah",
-    description: "Safe, long-life lithium technology",
-    sales_price_inc_tax: 40.99,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    price: 40.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "Safe, long-life lithium technology",
-    is_hot: true,
-    is_featured: false,
-  },
-  {
-    id: 103,
-    name: "Solar Motion Sensor Light (24W)",
-    description: "Smart motion-activated lighting",
-    sales_price_inc_tax: 119.99,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    price: 119.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "Smart motion-activated lighting",
-    is_hot: true,
-    is_featured: false,
-  },
-  {
-    id: 104,
-    name: "MPPT Charge Controller 60A",
-    description: "Maximum power point tracking",
-    sales_price_inc_tax: 119.99,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    price: 119.99,
-    image: "/solarpanel.png",
-    rating: 5,
-    stock_status: "in_stock",
-    short_description: "Maximum power point tracking",
-    is_hot: true,
-    is_featured: false,
-  },
+  // ... other fallback new arrivals
 ];
 
 export const fallbackCategories: Category[] = [
@@ -168,24 +89,39 @@ export const useHomepageData = () => {
       {
         queryKey: ['customer', 'categories', 'homepage'],
         queryFn: async () => {
-          const response = await customerApi.products.list(new URLSearchParams({ category: 'all' }));
-          const allProducts = response.data || response.products || response || [];
-          // Extract unique categories from products
-          const cats = allProducts
-            .map((p: any) => p.category)
-            .filter(Boolean)
-            .filter((v: any, i: number, a: any[]) => a.findIndex((t) => t.id === v.id) === i);
-          return cats.slice(0, 6).map((cat: any) => ({
-            id: cat.id,
-            name: cat.name,
-            image: cat.image || '/solarpanel.png',
-            description: cat.description || '',
-            slug: cat.slug || '',
-            created_at: cat.created_at || '',
-            updated_at: cat.updated_at || '',
-          }));
+          try {
+            // ✅ FIXED: Fetch categories directly from API
+            const response = await fetch('https://admin.bezalelsolar.com/api/categories');
+            const data = await response.json();
+            
+            console.log('Categories API response:', data);
+            
+            // Handle different response formats
+            let categories = [];
+            if (Array.isArray(data)) {
+              categories = data;
+            } else if (data?.data && Array.isArray(data.data)) {
+              categories = data.data;
+            } else if (data?.categories && Array.isArray(data.categories)) {
+              categories = data.categories;
+            }
+            
+            // Normalize categories
+            return categories.slice(0, 6).map((cat: any) => ({
+              id: cat.id,
+              name: cat.name,
+              image: cat.image || '/solarpanel.png',
+              description: cat.description || '',
+              slug: cat.slug || '',
+              created_at: cat.created_at || '',
+              updated_at: cat.updated_at || '',
+            }));
+          } catch (error) {
+            console.error('Failed to fetch categories:', error);
+            return fallbackCategories;
+          }
         },
-        staleTime: 10 * 60 * 1000,
+        staleTime: 5 * 60 * 1000, // 5 minutes
         retry: 1,
       },
     ],

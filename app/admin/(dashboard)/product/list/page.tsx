@@ -17,6 +17,7 @@ import {
   Loader2,
   PlusSquare,
 } from 'lucide-react';
+import { Product } from '@/types';
 
 const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
   if (!pathOrUrl) return '/man.png';
@@ -37,6 +38,46 @@ const resolveImageUrl = (pathOrUrl: string | null | undefined, fallback = '/sola
   return `${base}/storage/${raw}`;
 };
 
+// Helper to safely get image URL from product
+const getProductImageUrl = (product: any): string | null => {
+  // Check for image_urls array (from your API)
+  if (product.image_urls && Array.isArray(product.image_urls) && product.image_urls.length > 0) {
+    const imgData = product.image_urls[0];
+    if (imgData && typeof imgData === 'object') {
+      // Check for url property
+      if (imgData.url && typeof imgData.url === 'string') {
+        return imgData.url;
+      }
+      // Check for path property
+      if (imgData.path && typeof imgData.path === 'string') {
+        return resolveImageUrl(imgData.path);
+      }
+    }
+  }
+  
+  // Check for images array (string paths)
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    const img = product.images[0];
+    if (typeof img === 'string') {
+      return resolveImageUrl(img);
+    }
+    // Handle object in images array
+    if (img && typeof img === 'object') {
+      const imgObj = img as any;
+      if (imgObj.path && typeof imgObj.path === 'string') {
+        return resolveImageUrl(imgObj.path);
+      }
+    }
+  }
+  
+  // Check for direct image property
+  if (product.image && typeof product.image === 'string') {
+    return resolveImageUrl(product.image);
+  }
+  
+  return null;
+};
+
 export default function AdminProductListPage() {
   const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(1);
@@ -55,6 +96,53 @@ export default function AdminProductListPage() {
   });
   
   const deleteMutation = useDeleteProduct();
+
+  // Handle different API response formats
+  let products: any[] = [];
+  let current_page = 1;
+  let last_page = 1;
+
+  if (data) {
+    console.log('API Response:', data);
+    
+    if (Array.isArray(data)) {
+      // Direct array response (like your Postman)
+      products = data;
+      current_page = page;
+      last_page = 1;
+    } 
+    else if (data && typeof data === 'object') {
+      // Check for data property (paginated response)
+      if ('data' in data && Array.isArray(data.data)) {
+        products = data.data;
+        current_page = data.current_page || page;
+        last_page = data.last_page || 1;
+      }
+      // Check for products property
+      else if ('products' in data && Array.isArray(data.products)) {
+        products = data.products;
+        current_page = data.current_page || page;
+        last_page = data.last_page || 1;
+      }
+      // If it's an object but not array, try to get values
+      else {
+        const values = Object.values(data);
+        if (values.length > 0 && values.every(v => typeof v === 'object' && v !== null)) {
+          products = values;
+          current_page = page;
+          last_page = 1;
+        }
+      }
+    }
+  }
+
+  // Debug log (remove in production)
+  useEffect(() => {
+    if (data) {
+      console.log('API Response:', data);
+      console.log('Processed products:', products);
+    }
+  }, [data, products]);
 
   const avatarUrl = user?.avatar_url || user?.avatar 
     ? resolveAvatar(user.avatar_url || user.avatar) 
@@ -94,9 +182,6 @@ export default function AdminProductListPage() {
       }
     }
   };
-
-  const products = data?.data || [];
-  const { current_page, last_page } = data || {};
 
   if (!mounted) {
     return (
@@ -237,30 +322,39 @@ export default function AdminProductListPage() {
                         </td>
                       </tr>
                     ) : (
-                      products.map((product) => (
+                      products.map((product: any) => (
                         <tr key={`product-${product.id}-${product.updated_at || Date.now()}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             #{product.id}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {product.images && product.images.length > 0 ? (
-                              <Image
-                                src={resolveImageUrl(product.images[0])}
-                                alt={product.name}
-                                width={40}
-                                height={40}
-                                className="rounded-md object-cover h-10 w-10"
-                                unoptimized
-                              />
-                            ) : (
-                              <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-md" />
-                            )}
+                            {(() => {
+                              const imageUrl = getProductImageUrl(product);
+                              return imageUrl ? (
+                                <Image
+                                  src={imageUrl}
+                                  alt={product.name}
+                                  width={40}
+                                  height={40}
+                                  className="rounded-md object-cover h-10 w-10"
+                                  unoptimized
+                                />
+                              ) : (
+                                <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center">
+                                  <span className="text-xs text-gray-500">No img</span>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             {product.name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            ₦{Number(product.sales_price_inc_tax || 0).toLocaleString()}
+                            ₦{Number(
+                              product.sale_price_inc_tax || 
+                              product.sales_price_inc_tax || 
+                              0
+                            ).toLocaleString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             {product.current_stock ?? 'N/A'}
@@ -293,7 +387,7 @@ export default function AdminProductListPage() {
                 </table>
               </div>
 
-              {last_page && last_page > 1 && (
+              {last_page > 1 && (
                 <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 sm:px-6">
                   <div className="flex flex-1 justify-between sm:hidden">
                     <button

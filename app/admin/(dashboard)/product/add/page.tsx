@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ChangeEvent } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,6 +32,14 @@ type Category = {
   tag_id: number | null;
 };
 
+type Tag = {
+  id: number;
+  name: string;
+  slug?: string;
+  description?: string;
+  is_active?: boolean;
+};
+
 const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
   if (!pathOrUrl) return '/man.png';
   const raw = String(pathOrUrl).trim();
@@ -47,12 +56,10 @@ export default function AddProductPage() {
   const [mounted, setMounted] = useState(false);
   const queryClient = useQueryClient();
 
-  const [productName, setProductName] = useState('Lithium LiFePO4 Battery 12 / 100Ah');
-  const [description, setDescription] = useState(
-    'Upgrade your energy storage with this high-performance 12V 100Ah Lithium Iron Phosphate (LiFePO4) battery. Designed as a superior drop-in replacement for traditional lead-acid batteries, it delivers consistent power, significantly longer lifespan, and cutting-edge safety features in a package that weighs half as much.'
-  );
-  const [price, setPrice] = useState('999.89');
-  const [discountedPrice, setDiscountedPrice] = useState('900.89');
+  const [productName, setProductName] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [discountedPrice, setDiscountedPrice] = useState('');
   const [taxIncluded, setTaxIncluded] = useState(true);
   const [stockQuantity, setStockQuantity] = useState('');
   const [stockStatus, setStockStatus] = useState('In Stock');
@@ -65,6 +72,11 @@ export default function AddProductPage() {
   const [categoryId, setCategoryId] = useState<string>("");
   const [catLoading, setCatLoading] = useState(false);
   const [catError, setCatError] = useState<string | null>(null);
+
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState<string | null>(null);
 
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const colorOptions = ['#90EE90', '#FFB6C1', '#D3D3D3', '#000000', '#FFD700'];
@@ -124,9 +136,46 @@ export default function AddProductPage() {
     }
   }
 
+  async function fetchTags() {
+    setTagsLoading(true);
+    setTagsError(null);
+    
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await api.get('/tags');
+      const data = response.data;
+      
+      let tagsList = [];
+      if (Array.isArray(data)) {
+        tagsList = data;
+      } else if (data?.data && Array.isArray(data.data)) {
+        tagsList = data.data;
+      } else if (data?.tags && Array.isArray(data.tags)) {
+        tagsList = data.tags;
+      }
+      
+      setTags(tagsList);
+    } catch (error: any) {
+      setTagsError(error?.message || 'Failed to load tags');
+      
+      if (error?.message?.includes('401') || error?.status === 401) {
+        localStorage.removeItem('adminToken');
+        router.push('/login');
+      }
+    } finally {
+      setTagsLoading(false);
+    }
+  }
+
   useEffect(() => {
     setMounted(true);
     fetchCategories();
+    fetchTags();
   }, []);
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -169,6 +218,14 @@ export default function AddProductPage() {
       prev.includes(color)
         ? prev.filter(c => c !== color)
         : [...prev, color]
+    );
+  };
+
+  const toggleTag = (tagId: number) => {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
     );
   };
 
@@ -235,6 +292,7 @@ export default function AddProductPage() {
       stock_quantity: unlimitedStock ? undefined : stockQuantity,
       images: imageFiles,
       colours: selectedColors,
+      tag_ids: selectedTagIds,
       customize: true,
     };
 
@@ -362,6 +420,12 @@ export default function AddProductPage() {
         {catError && (
           <div className="mb-6 rounded-xl px-4 py-3 text-sm border bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300">
             Error loading categories: {catError}
+          </div>
+        )}
+
+        {tagsError && (
+          <div className="mb-6 rounded-xl px-4 py-3 text-sm border bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300">
+            Error loading tags: {tagsError}
           </div>
         )}
 
@@ -641,7 +705,7 @@ export default function AddProductPage() {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-              <h3 className="text-xl font-bold mb-6">Categories</h3>
+              <h3 className="text-xl font-bold mb-6">Categories & Tags</h3>
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2">Product Categories</label>
@@ -666,15 +730,59 @@ export default function AddProductPage() {
                     </select>
                   )}
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-2">Product Tag</label>
-                  <select
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg opacity-60 cursor-not-allowed"
-                    disabled
-                  >
-                    <option>Tag endpoint not available now</option>
-                  </select>
+                  <label className="block text-sm font-medium mb-2">Product Tags</label>
+                  {tagsLoading ? (
+                    <div className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-500">
+                      Loading tags...
+                    </div>
+                  ) : tagsError ? (
+                    <div className="w-full px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                      {tagsError}
+                    </div>
+                  ) : tags.length === 0 ? (
+                    <div className="w-full px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+                      No tags found. <Link href="/admin/tags" className="underline font-medium">Create tags first</Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-lg">
+                        {tags
+                          .filter((tag) => tag.is_active !== false)
+                          .map((tag) => (
+                            <label
+                              key={tag.id}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${
+                                selectedTagIds.includes(tag.id)
+                                  ? 'bg-[#4EA674] text-white border-[#4EA674]'
+                                  : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedTagIds.includes(tag.id)}
+                                onChange={() => toggleTag(tag.id)}
+                                className="hidden"
+                              />
+                              <span className="text-sm">{tag.name}</span>
+                            </label>
+                          ))}
+                      </div>
+                      {selectedTagIds.length > 0 && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Selected: {selectedTagIds.length} tag{selectedTagIds.length !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                      <div className="text-xs text-gray-500">
+                        <Link href="/admin/tags" className="text-[#4EA674] hover:underline">
+                          Manage Tags
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Select your color</label>
                   <div className="flex gap-3 flex-wrap">

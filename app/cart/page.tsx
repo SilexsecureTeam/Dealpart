@@ -4,23 +4,20 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Heart,
-  Trash2,
-  Plus,
-  Minus,
-  ShoppingBag,
-  ChevronRight,
-  Loader2,
-} from 'lucide-react';
-
-// ---------- React Query Hooks ----------
+import { Heart, Trash2, Plus, Minus, ShoppingBag, ChevronRight, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useCart, useUpdateCartItem, useRemoveCartItem, useCartSummary } from '@/hooks/useCart';
+
+const getSafeImageUrl = (image: string | null | undefined): string | null => {
+  if (!image || typeof image !== 'string' || image.trim() === '') return null;
+  if (image.startsWith('http://') || image.startsWith('https://')) return image;
+  const cleanImage = image.startsWith('/') ? image.substring(1) : image;
+  return `https://admin.bezalelsolar.com/storage/products/${cleanImage}`;
+};
 
 export default function CartPage() {
   const router = useRouter();
 
-  // ---------- React Query ----------
   const {
     data: items = [],
     isLoading,
@@ -31,39 +28,85 @@ export default function CartPage() {
   const updateMutation = useUpdateCartItem();
   const removeMutation = useRemoveCartItem();
 
-  // ---------- Local UI state for loading indicators ----------
   const [updatingItems, setUpdatingItems] = useState<Record<number, boolean>>({});
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
-  // ---------- Calculate summary ----------
   const { count, total } = useCartSummary(items);
 
-  // ---------- Update Quantity Handler ----------
   const handleUpdateQuantity = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
+    
     setUpdatingItems((prev) => ({ ...prev, [itemId]: true }));
+    
     try {
       await updateMutation.mutateAsync({ itemId, quantity: newQuantity });
-    } catch (error) {
+      await refetch();
+      toast.success('Cart updated successfully');
+    } catch (error: any) {
       console.error('Failed to update quantity:', error);
+      
+      if (error?.message === 'CART_ITEM_NOT_FOUND' || error?.message?.includes('404')) {
+        toast.error('This item is no longer available');
+        await refetch(); // Refresh to get correct items
+      } else {
+        toast.error('Failed to update cart');
+      }
     } finally {
       setUpdatingItems((prev) => ({ ...prev, [itemId]: false }));
     }
   };
 
-  // ---------- Remove Item Handler ----------
   const handleRemoveItem = async (itemId: number) => {
-    if (!confirm('Remove this item from cart?')) return;
-    setUpdatingItems((prev) => ({ ...prev, [itemId]: true }));
-    try {
-      await removeMutation.mutateAsync(itemId);
-    } catch (error) {
-      console.error('Failed to remove item:', error);
-    } finally {
-      setUpdatingItems((prev) => ({ ...prev, [itemId]: false }));
-    }
+    // Replace confirm with toast confirmation
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <p className="font-medium text-gray-900">Remove this item from cart?</p>
+        <p className="text-sm text-gray-500">This action cannot be undone.</p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              setUpdatingItems((prev) => ({ ...prev, [itemId]: true }));
+              
+              try {
+                await removeMutation.mutateAsync(itemId);
+                await refetch();
+                toast.success('Item removed from cart');
+              } catch (error: any) {
+                console.error('Failed to remove item:', error);
+                
+                if (error?.message === 'CART_ITEM_NOT_FOUND' || error?.message?.includes('404')) {
+                  toast.error('Item already removed');
+                  await refetch(); // Refresh to get correct items
+                } else {
+                  toast.error('Failed to remove item');
+                }
+              } finally {
+                setUpdatingItems((prev) => ({ ...prev, [itemId]: false }));
+              }
+            }}
+            className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          >
+            Yes, Remove
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 8000,
+      position: 'top-center',
+    });
   };
 
-  // ---------- Loading State ----------
+  const handleImageError = (itemId: number) => {
+    setImageErrors(prev => ({ ...prev, [itemId]: true }));
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center">
@@ -72,7 +115,6 @@ export default function CartPage() {
     );
   }
 
-  // ---------- Error State ----------
   if (error) {
     return (
       <div className="min-h-screen bg-[#EAF8E7]/50 flex items-center justify-center p-4">
@@ -93,7 +135,6 @@ export default function CartPage() {
     );
   }
 
-  // ---------- Empty Cart ----------
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-[#EAF8E7]/50">
@@ -123,7 +164,6 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-[#EAF8E7]/50">
       <div className="container mx-auto px-4 py-6 md:py-10">
-        {/* ---------- Breadcrumb ---------- */}
         <div className="text-sm text-gray-600 mb-6 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-[#4EA674]">
             Home
@@ -137,27 +177,37 @@ export default function CartPage() {
         </h1>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* ---------- Cart Items ---------- */}
           <div className="flex-1">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               {items.map((item) => {
                 const isUpdating = updatingItems[item.id] || updateMutation.isPending || removeMutation.isPending;
+                const safeImageUrl = getSafeImageUrl(item.image);
+                const hasImageError = imageErrors[item.id];
+                const showFallback = !safeImageUrl || hasImageError;
+                
                 return (
                   <div
                     key={item.id}
                     className="flex flex-col sm:flex-row gap-4 p-4 border-b border-gray-100 last:border-0"
                   >
-                    {/* Product Image */}
                     <div className="relative w-full sm:w-24 h-24 flex-shrink-0">
-                      <Image
-                        src={item.image || '/offer.jpg'}
-                        alt={item.name}
-                        fill
-                        className="object-cover rounded-lg"
-                      />
+                      {!showFallback ? (
+                        <Image
+                          src={safeImageUrl!}
+                          alt={item.name || 'Product'}
+                          fill
+                          className="object-cover rounded-lg"
+                          onError={() => handleImageError(item.id)}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+                          <span className="text-2xl font-bold text-gray-400">
+                            {item.name?.charAt(0).toUpperCase() || 'P'}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Product Info */}
                     <div className="flex-1 flex flex-col sm:flex-row gap-4">
                       <div className="flex-1">
                         <Link
@@ -171,14 +221,12 @@ export default function CartPage() {
                         </p>
                       </div>
 
-                      {/* Price */}
                       <div className="text-right sm:text-left">
                         <p className="text-lg font-bold text-[#4EA674]">
                           ₦{item.price.toLocaleString()}
                         </p>
                       </div>
 
-                      {/* Quantity Controls */}
                       <div className="flex items-center justify-between sm:justify-start gap-4">
                         <div className="flex items-center border border-gray-300 rounded-lg">
                           <button
@@ -228,7 +276,6 @@ export default function CartPage() {
             </div>
           </div>
 
-          {/* ---------- Order Summary ---------- */}
           <div className="lg:w-96">
             <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
