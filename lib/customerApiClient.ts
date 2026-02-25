@@ -151,76 +151,76 @@ export const customerApi = {
     },
   },
 
-locations: {
-  getStates: async () => {
-    const token = getToken();
-    const res = await fetch('https://admin.bezalelsolar.com/api/state', {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-    });
-    return res.json();
+  locations: {
+    getStates: async () => {
+      const token = getToken();
+      const res = await fetch('https://admin.bezalelsolar.com/api/state', {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      return res.json();
+    },
+    
+    getLocations: async () => {
+      const token = getToken();
+      const res = await fetch('https://admin.bezalelsolar.com/api/locations', {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      return res.json();
+    },
   },
-  
-  getLocations: async () => {
-    const token = getToken();
-    const res = await fetch('https://admin.bezalelsolar.com/api/locations', {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-    });
-    return res.json();
-  },
-},
 
-delivery: {
-  calculateFee: async (state_name: string, lga_name: string) => {
-    const token = getToken();
-    const formData = new FormData();
-    formData.append('state_name', state_name);
-    formData.append('lga_name', lga_name);
-    
-    const res = await fetch('https://admin.bezalelsolar.com/api/delivery-fee', {
-      method: 'POST',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: formData,
-    });
-    
-    if (!res.ok) {
-      throw new Error('Failed to calculate delivery fee');
-    }
-    
-    return res.json();
+  delivery: {
+    calculateFee: async (state_name: string, lga_name: string) => {
+      const token = getToken();
+      const formData = new FormData();
+      formData.append('state_name', state_name);
+      formData.append('lga_name', lga_name);
+      
+      const res = await fetch('https://admin.bezalelsolar.com/api/delivery-fee', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to calculate delivery fee');
+      }
+      
+      return res.json();
+    },
   },
-},
 
-taxes: {
-  getActive: async () => {
-    const token = getToken();
-    const res = await fetch('https://admin.bezalelsolar.com/api/taxes', {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-    });
-    
-    if (!res.ok) {
-      throw new Error('Failed to fetch taxes');
-    }
-    
-    const data = await res.json();
-    
-    if (Array.isArray(data)) {
-      return data.find(tax => tax.is_active === 1 || tax.is_active === true);
-    }
-    
-    return data;
+  taxes: {
+    getActive: async () => {
+      const token = getToken();
+      const res = await fetch('https://admin.bezalelsolar.com/api/taxes', {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to fetch taxes');
+      }
+      
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        return data.find(tax => tax.is_active === 1 || tax.is_active === true);
+      }
+      
+      return data;
+    },
   },
-},
 
   profile: {
     get: () => authFetch(Endpoints.customer.profile).then((res) => res.json()),
@@ -273,87 +273,85 @@ taxes: {
       }
     },
     
-  add: async (product_id: number, quantity: number, price: number, color: string) => {
-  try {
-    const token = getToken();
-    
-  
-    const requestBody = { 
-      product_id: product_id.toString(),
-      quantity: quantity.toString(),
-      price: price.toString(),
-      color: color 
-    };
-    
-    if (!token) {
-      let cartSession = localStorage.getItem('cartSessionId');
-      if (!cartSession) {
-        cartSession = crypto.randomUUID?.() || `guest_${Date.now()}`;
-        localStorage.setItem('cartSessionId', cartSession);
+    add: async (product_id: number, quantity: number, price: number, color: string) => {
+      try {
+        const token = getToken();
+        
+        const requestBody = { 
+          product_id: product_id.toString(),
+          quantity: quantity.toString(),
+          price: price.toString(),
+          color: color 
+        };
+        
+        if (!token) {
+          let cartSession = localStorage.getItem('cartSessionId');
+          if (!cartSession) {
+            cartSession = crypto.randomUUID?.() || `guest_${Date.now()}`;
+            localStorage.setItem('cartSessionId', cartSession);
+          }
+          
+          const res = await fetch(Endpoints.customer.cartAdd, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'X-Cart-Session': cartSession,
+            },
+            body: JSON.stringify(requestBody),
+          });
+          
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData?.message || `Failed to add to cart (${res.status})`);
+          }
+          
+          return await res.json();
+        }
+        
+        const res = await authFetch(Endpoints.customer.cartAdd, {
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+        });
+        
+        if (!res.ok) {
+          if (res.status === 422) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData?.message || 'Validation failed');
+          }
+          throw new Error(`Failed to add to cart (${res.status})`);
+        }
+        
+        return await res.json();
+      } catch (error) {
+        console.error('Cart add error:', error);
+        throw error; 
       }
-      
-      const res = await fetch(Endpoints.customer.cartAdd, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Cart-Session': cartSession,
-        },
-        body: JSON.stringify(requestBody),
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData?.message || `Failed to add to cart (${res.status})`);
-      }
-      
-      return await res.json();
-    }
-    
-    const res = await authFetch(Endpoints.customer.cartAdd, {
-      method: 'POST',
-      body: JSON.stringify(requestBody),
-    });
-    
-    if (!res.ok) {
-      if (res.status === 422) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData?.message || 'Validation failed');
-      }
-      throw new Error(`Failed to add to cart (${res.status})`);
-    }
-    
-    return await res.json();
-  } catch (error) {
-    console.error('Cart add error:', error);
-    throw error; 
-  }
-},
+    },
 
-
-update: async (itemId: number, quantity: number) => {
-  try {
-    const res = await authFetch(Endpoints.customer.cartUpdate(itemId), {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity: quantity.toString() }),
-    });
-    
-    if (res.status === 404) {
-      
-      throw new Error('CART_ITEM_NOT_FOUND');
-    }
-    
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData?.message || 'Failed to update cart');
-    }
-    
-    return await res.json();
-  } catch (error) {
-    console.error('Cart update error:', error);
-    throw error;
-  }
-},
+    update: async (itemId: number, quantity: number) => {
+      try {
+        const res = await authFetch(Endpoints.customer.cartUpdate(itemId), {
+          method: 'PATCH',
+          body: JSON.stringify({ quantity: quantity.toString() }),
+        });
+        
+        if (res.status === 404) {
+          console.log(`Cart item ${itemId} not found for update`); // Changed to log
+          throw new Error('CART_ITEM_NOT_FOUND');
+        }
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData?.message || 'Failed to update cart');
+        }
+        
+        return await res.json();
+      } catch (error) {
+        console.error('Cart update error:', error);
+        throw error;
+      }
+    },
     
     remove: async (itemId: number) => {
       try {
@@ -361,8 +359,12 @@ update: async (itemId: number, quantity: number) => {
           method: 'DELETE',
         });
         
+        if (res.status === 404) {
+          console.log(`Cart item ${itemId} already removed`); // Changed to log
+          return { success: true, id: itemId, alreadyRemoved: true };
+        }
+        
         if (!res.ok) {
-          if (res.status === 404) throw new Error('Cart item not found');
           throw new Error('Failed to remove from cart');
         }
         
@@ -466,7 +468,6 @@ update: async (itemId: number, quantity: number) => {
     },
   },
 
-  
   wishlist: {
     list: async (params?: URLSearchParams) => {
       try {
@@ -504,35 +505,36 @@ update: async (itemId: number, quantity: number) => {
       }
     },
     
-    remove: async (id: number) => {
-      try {
-        const res = await authFetch(Endpoints.customer.wishlistItem(id), {
-          method: 'DELETE',
-        });
-        
-        if (res.status === 404) {
-          return { success: true, id, message: 'Item not found in wishlist' };
-        }
-        
-        if (!res.ok) {
-          throw new Error(`Failed to remove from wishlist (${res.status})`);
-        }
-        
-        if (res.status === 204) return { success: true, id };
-        
-        const responseText = await res.text();
-        try {
-          return responseText ? JSON.parse(responseText) : { success: true, id };
-        } catch {
-          return { success: true, id };
-        }
-      } catch (error) {
-        console.error('Error removing from wishlist:', error);
-        if (error instanceof Error && error.message.includes('404')) {
-          return { success: true, id, message: 'Item not found' };
-        }
-        throw error;
-      }
-    },
+  remove: async (id: number) => {
+  try {
+    const res = await authFetch(Endpoints.customer.wishlistItem(id), {
+      method: 'DELETE',
+    });
+    
+    if (res.status === 404) {
+      console.log(`Wishlist item ${id} already removed`); 
+      return { success: true, id, alreadyRemoved: true };
+    }
+    
+    if (!res.ok) {
+      throw new Error(`Failed to remove from wishlist (${res.status})`);
+    }
+    
+    if (res.status === 204) return { success: true, id };
+    
+    const responseText = await res.text();
+    try {
+      return responseText ? JSON.parse(responseText) : { success: true, id };
+    } catch {
+      return { success: true, id };
+    }
+  } catch (error) {
+    console.error('Error removing from wishlist:', error);
+    if (error instanceof Error && error.message.includes('404')) {
+      return { success: true, id, alreadyRemoved: true };
+    }
+    throw error;
+  }
+},
   },
 } as const;

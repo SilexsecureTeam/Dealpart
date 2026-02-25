@@ -100,6 +100,17 @@ export const useRemoveFromWishlist = () => {
       // No need to invalidate here since we already did optimistic update
     },
     onError: (error, variables, context) => {
+      // Check if it's a 404 error (already handled in mutationFn, but just in case)
+      if (error?.message?.includes('not found') || error?.message?.includes('404')) {
+        console.log(`Item ${variables} already removed (handled in onError)`);
+        // Still refresh to be safe
+        queryClient.invalidateQueries({ 
+          queryKey: ['customer', 'wishlist'],
+          refetchType: 'all' 
+        });
+        return;
+      }
+      
       // This will now only run for non-404 errors
       console.error('Remove from wishlist error:', error, 'for item:', variables);
       

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useProducts, useDeleteProduct } from '@/hooks/useProducts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -16,8 +16,13 @@ import {
   Trash2,
   Loader2,
   PlusSquare,
+  X,
+  Check,
+  Download,
+  RefreshCw
 } from 'lucide-react';
 import { Product } from '@/types';
+import toast from 'react-hot-toast';
 
 const resolveAvatar = (pathOrUrl: string | null | undefined): string => {
   if (!pathOrUrl) return '/man.png';
@@ -78,11 +83,96 @@ const getProductImageUrl = (product: any): string | null => {
   return null;
 };
 
+// Polling Status Component
+const PollingStatus = () => {
+  return (
+    <div className="fixed top-20 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+      <RefreshCw className="w-4 h-4 animate-spin" />
+      <span className="text-sm">Auto-refresh every 30s</span>
+    </div>
+  );
+};
+
+// Bulk Actions Bar Component
+const BulkActionsBar = ({ 
+  selectedCount, 
+  onClearSelection, 
+  onBulkDelete,
+  onBulkStatusUpdate,
+  onExport,
+  isDeleting 
+}: any) => {
+  if (selectedCount === 0) return null;
+
+  return (
+    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-full shadow-2xl border border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-4">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {selectedCount} selected
+        </span>
+        
+        <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+        
+        <button
+          onClick={onClearSelection}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        
+        <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+        
+        <button
+          onClick={() => onBulkStatusUpdate('published')}
+          className="text-sm text-green-600 hover:text-green-700"
+          title="Publish selected"
+        >
+          <Check className="w-4 h-4" />
+        </button>
+        
+        <button
+          onClick={() => onBulkStatusUpdate('draft')}
+          className="text-sm text-yellow-600 hover:text-yellow-700"
+          title="Move to draft"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        
+        <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+        
+        <button
+          onClick={() => onExport('csv')}
+          className="text-sm text-blue-600 hover:text-blue-700"
+          title="Export"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+        
+        <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+        
+        <button
+          onClick={onBulkDelete}
+          disabled={isDeleting}
+          className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+          title="Delete selected"
+        >
+          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function AdminProductListPage() {
   const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  
+  // Use ref to track if this is the first render
+  const isFirstRender = useRef(true);
   
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
@@ -136,6 +226,63 @@ export default function AdminProductListPage() {
     }
   }
 
+  // FIXED: Handle select all with proper dependencies and conditions
+  useEffect(() => {
+    // Skip on first render to prevent infinite loop
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Only run if we have products and selectAll is true
+    if (selectAll && products.length > 0) {
+      const allProductIds = products.map(p => p.id);
+      // Only update if the selected products are different from all product IDs
+      setSelectedProducts(prev => {
+        // Check if the arrays are the same (order doesn't matter)
+        const areEqual = 
+          prev.length === allProductIds.length && 
+          prev.every(id => allProductIds.includes(id));
+        
+        return areEqual ? prev : allProductIds;
+      });
+    } else if (!selectAll && selectedProducts.length > 0) {
+      // Only clear if there are selected products
+      setSelectedProducts([]);
+    }
+  }, [selectAll, products, selectedProducts.length]);
+
+  // Polling for updates (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [queryClient]);
+
+  // FIXED: Handle individual selection without causing loops
+  const handleSelectProduct = useCallback((productId: number) => {
+    setSelectedProducts(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
+    // Update selectAll state based on new selection
+    setSelectAll(false); // Temporarily set to false, will be recalculated if needed
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectAll(prev => !prev);
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedProducts([]);
+    setSelectAll(false);
+  }, []);
+
   // Debug log (remove in production)
   useEffect(() => {
     if (data) {
@@ -177,9 +324,88 @@ export default function AdminProductListPage() {
       try {
         await deleteMutation.mutateAsync(id);
         queryClient.invalidateQueries({ queryKey: ['products'] });
+        toast.success('Product deleted successfully');
       } catch (error) {
         console.error('Failed to delete product:', error);
+        toast.error('Failed to delete product');
       }
+    }
+  };
+
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    if (selectedProducts.length === 0) return;
+    
+    if (window.confirm(`Are you sure you want to delete ${selectedProducts.length} products?`)) {
+      try {
+        // Delete products one by one
+        await Promise.all(selectedProducts.map(id => deleteMutation.mutateAsync(id)));
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        handleClearSelection();
+        toast.success(`${selectedProducts.length} products deleted successfully`);
+      } catch (error) {
+        console.error('Failed to delete products:', error);
+        toast.error('Failed to delete products');
+      }
+    }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    if (selectedProducts.length === 0) return;
+    
+    try {
+      const response = await fetch('/api/products/bulk-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedProducts, status })
+      });
+      
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        handleClearSelection();
+        toast.success(`Products updated to ${status}`);
+      } else {
+        toast.error('Failed to update product status');
+      }
+    } catch (error) {
+      console.error('Failed to update product status:', error);
+      toast.error('Failed to update product status');
+    }
+  };
+
+  const handleExport = async (format: 'csv' | 'excel') => {
+    try {
+      toast.loading('Preparing export...', { id: 'export' });
+      
+      const response = await fetch(`/api/products/export?format=${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ids: selectedProducts.length > 0 ? selectedProducts : undefined,
+          search: searchQuery
+        })
+      });
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `products_export.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Export completed successfully', { id: 'export' });
+      
+      if (selectedProducts.length > 0) {
+        handleClearSelection();
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Export failed', { id: 'export' });
     }
   };
 
@@ -193,6 +419,19 @@ export default function AdminProductListPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      {/* Polling Status Indicator */}
+      <PollingStatus />
+
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedCount={selectedProducts.length}
+        onClearSelection={handleClearSelection}
+        onBulkDelete={handleBulkDelete}
+        onBulkStatusUpdate={handleBulkStatusUpdate}
+        onExport={handleExport}
+        isDeleting={deleteMutation.isPending}
+      />
+
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3.5 sm:px-6 sm:py-4 flex items-center justify-between shadow-sm lg:pl-72">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
           Products
@@ -268,7 +507,14 @@ export default function AdminProductListPage() {
       <main className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 lg:pl-72">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">All Products</h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">All Products</h2>
+              {selectedProducts.length > 0 && (
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedProducts.length} selected
+                </span>
+              )}
+            </div>
             <button
               onClick={() => router.push('/admin/product/add')}
               className="px-4 py-2.5 bg-[#4EA674] text-white rounded-full text-sm font-medium flex items-center gap-2 hover:bg-[#3D8B59] transition-colors w-full sm:w-auto justify-center"
@@ -294,6 +540,14 @@ export default function AdminProductListPage() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-[#EAF8E7] dark:bg-[#2A4A2F]">
                     <tr>
+                      <th scope="col" className="px-6 py-4 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleSelectAll}
+                          className="rounded border-gray-300 text-[#4EA674] focus:ring-[#4EA674]"
+                        />
+                      </th>
                       <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-[#4EA674] uppercase tracking-wider rounded-l-xl">
                         ID
                       </th>
@@ -317,13 +571,21 @@ export default function AdminProductListPage() {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {products.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                           {searchQuery ? 'No products match your search' : 'No products yet. Create your first product!'}
                         </td>
                       </tr>
                     ) : (
                       products.map((product: any) => (
                         <tr key={`product-${product.id}-${product.updated_at || Date.now()}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedProducts.includes(product.id)}
+                              onChange={() => handleSelectProduct(product.id)}
+                              className="rounded border-gray-300 text-[#4EA674] focus:ring-[#4EA674]"
+                            />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             #{product.id}
                           </td>

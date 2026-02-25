@@ -67,10 +67,12 @@ export default function AdminSidebar() {
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
-  const toggleMobile = () => setMobileOpen(!toggleMobile);
+  // FIXED: toggleMobile now correctly toggles the state
+  const toggleMobile = () => setMobileOpen(!mobileOpen);
 
   const handleLogout = () => {
     logout();
+    setMobileOpen(false); // Close mobile menu on logout
   };
 
   // Update avatar when user changes
@@ -102,6 +104,11 @@ export default function AdminSidebar() {
     if (img.src === '/man.png') return;
     img.src = '/man.png';
   };
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   // Get user display info
   const displayName = user?.name || 
