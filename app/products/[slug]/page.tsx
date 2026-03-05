@@ -20,6 +20,7 @@ import { addToCart } from '@/lib/cart';
 import { useProductBySlug, fallbackProductDetail } from '@/hooks/useProductBySlug';
 import { useRelatedProducts, RelatedProduct } from '@/hooks/useRelatedProducts';
 import { useWishlist, useAddToWishlist, useRemoveFromWishlist } from '@/hooks/useWishlist';
+import { useCart } from '@/hooks/useCart'; // Make sure you have this hook
 
 // ---------- Helper: create slug ----------
 function createSlug(name: string): string {
@@ -47,24 +48,31 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);               // for main product
+  const [buyingNow, setBuyingNow] = useState(false);          // for buy now
   const [addingRelated, setAddingRelated] = useState<Record<number, boolean>>({}); // for related products
 
   const { data: product, isLoading, error } = useProductBySlug(resolvedSlug || '');
   const { data: relatedProducts = [] } = useRelatedProducts(product?.category_id, product?.id);
   const { data: wishlist = [] } = useWishlist();
+  const { refetch: refetchCart } = useCart(); // To refresh cart after adding
   const addToWishlist = useAddToWishlist();
   const removeFromWishlist = useRemoveFromWishlist();
 
   const increaseQty = () => setQuantity((q) => q + 1);
   const decreaseQty = () => setQuantity((q) => (q > 1 ? q - 1 : 1));
 
-  // Handler for main product
+  // Handler for Add to Cart
   async function handleAddToCart() {
     if (!product) return;
     try {
       setAdding(true);
       await addToCart(product.id, quantity, product.price);
-      alert('Added to cart ✅');
+      
+      // Refresh cart data
+      await refetchCart();
+      
+      // Show success message
+      alert('✅ Added to cart successfully!');
     } catch (e: any) {
       if (e?.message === 'LOGIN_REQUIRED' || e?.message === 'SESSION_EXPIRED') {
         router.push(`/login?next=${encodeURIComponent(pathname || `/products/${resolvedSlug}`)}`);
@@ -76,12 +84,41 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     }
   }
 
-  // Handler for related products
+  // Handler for Buy Now - Add to cart and go to checkout
+  async function handleBuyNow() {
+    if (!product) return;
+    try {
+      setBuyingNow(true);
+      
+      // Add to cart first
+      await addToCart(product.id, quantity, product.price);
+      
+      // Refresh cart data
+      await refetchCart();
+      
+      // Redirect to checkout page
+      router.push('/checkout');
+      
+    } catch (e: any) {
+      if (e?.message === 'LOGIN_REQUIRED' || e?.message === 'SESSION_EXPIRED') {
+        router.push(`/login?next=${encodeURIComponent('/checkout')}`);
+        return;
+      }
+      alert(e?.message || 'Failed to process order');
+      setBuyingNow(false);
+    }
+  }
+
+  // Handler for related products add to cart
   async function handleAddRelatedToCart(id: number, price: number) {
     try {
       setAddingRelated((prev) => ({ ...prev, [id]: true }));
       await addToCart(id, 1, price);
-      alert('Added to cart ✅');
+      
+      // Refresh cart data
+      await refetchCart();
+      
+      alert('✅ Added to cart successfully!');
     } catch (e: any) {
       if (e?.message === 'LOGIN_REQUIRED' || e?.message === 'SESSION_EXPIRED') {
         router.push(`/login?next=${encodeURIComponent(pathname || `/products/${resolvedSlug}`)}`);
@@ -89,6 +126,30 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       }
       alert(e?.message || 'Failed to add to cart');
     } finally {
+      setAddingRelated((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
+  // Handler for Related Products Buy Now
+  async function handleRelatedBuyNow(id: number, price: number) {
+    try {
+      setAddingRelated((prev) => ({ ...prev, [id]: true }));
+      
+      // Add to cart
+      await addToCart(id, 1, price);
+      
+      // Refresh cart data
+      await refetchCart();
+      
+      // Redirect to checkout
+      router.push('/checkout');
+      
+    } catch (e: any) {
+      if (e?.message === 'LOGIN_REQUIRED' || e?.message === 'SESSION_EXPIRED') {
+        router.push(`/login?next=${encodeURIComponent('/checkout')}`);
+        return;
+      }
+      alert(e?.message || 'Failed to process order');
       setAddingRelated((prev) => ({ ...prev, [id]: false }));
     }
   }
@@ -227,33 +288,48 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             <div className="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
               {/* Quantity Selector */}
               <div className="flex items-center border-2 border-gray-300 rounded w-full sm:w-auto">
-                <button onClick={decreaseQty} className="px-4 py-3 hover:bg-gray-100 text-gray-600 font-bold">-</button>
+                <button 
+                  onClick={decreaseQty} 
+                  className="px-4 py-3 hover:bg-gray-100 text-gray-600 font-bold"
+                  disabled={adding || buyingNow}
+                >-</button>
                 <input
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                   min="1"
                   className="w-16 text-center border-x-2 border-gray-300 py-3 focus:outline-none font-semibold"
+                  disabled={adding || buyingNow}
                 />
-                <button onClick={increaseQty} className="px-4 py-3 hover:bg-gray-100 text-gray-600 font-bold">+</button>
+                <button 
+                  onClick={increaseQty} 
+                  className="px-4 py-3 hover:bg-gray-100 text-gray-600 font-bold"
+                  disabled={adding || buyingNow}
+                >+</button>
               </div>
 
               {/* Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 flex-1">
                 <button
                   onClick={handleAddToCart}
-                  disabled={adding}
+                  disabled={adding || buyingNow}
                   className="flex-1 bg-[#4EA674] text-white py-3 px-6 rounded font-semibold hover:bg-[#3D8B59] transition shadow-sm disabled:opacity-60"
                 >
                   {adding ? 'Adding...' : 'Add to Cart'}
                 </button>
-                <button className="flex-1 bg-black text-white py-3 px-6 rounded font-semibold hover:bg-gray-800 transition shadow-sm">
-                  Buy Now
+                
+                <button
+                  onClick={handleBuyNow}
+                  disabled={buyingNow || adding}
+                  className="flex-1 bg-black text-white py-3 px-6 rounded font-semibold hover:bg-gray-800 transition shadow-sm disabled:opacity-60"
+                >
+                  {buyingNow ? 'Processing...' : 'Buy Now'}
                 </button>
+                
                 <button
                   onClick={() => handleWishlistToggle(p.id)}
-                  disabled={addToWishlist.isPending || removeFromWishlist.isPending}
-                  className="p-3 border border-gray-300 rounded hover:bg-gray-100 transition"
+                  disabled={addToWishlist.isPending || removeFromWishlist.isPending || buyingNow}
+                  className="p-3 border border-gray-300 rounded hover:bg-gray-100 transition disabled:opacity-60"
                   title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
@@ -505,6 +581,13 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             className="flex-1 bg-[#4EA674] text-white text-xs py-1.5 rounded hover:bg-[#3D8B59] transition disabled:opacity-60"
                           >
                             {addingRelated[item.id] ? 'Adding...' : 'Add to cart'}
+                          </button>
+                          <button
+                            onClick={() => handleRelatedBuyNow(item.id, item.price)}
+                            disabled={addingRelated[item.id]}
+                            className="flex-1 bg-black text-white text-xs py-1.5 rounded hover:bg-gray-800 transition disabled:opacity-60"
+                          >
+                            Buy Now
                           </button>
                         </div>
                       </div>

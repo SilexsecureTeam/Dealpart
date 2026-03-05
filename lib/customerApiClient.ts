@@ -45,6 +45,14 @@ interface ProfileUpdateData {
   avatar?: File;
 }
 
+interface WishlistItem {
+  id: number;
+  product_id: number;
+  name?: string;
+  price?: number;
+  [key: string]: any;
+}
+
 export const customerApi = {
   auth: {
     login: async (login: string, password: string) => {
@@ -337,7 +345,7 @@ export const customerApi = {
         });
         
         if (res.status === 404) {
-          console.log(`Cart item ${itemId} not found for update`); // Changed to log
+          console.log(`Cart item ${itemId} not found for update`); 
           throw new Error('CART_ITEM_NOT_FOUND');
         }
         
@@ -360,7 +368,7 @@ export const customerApi = {
         });
         
         if (res.status === 404) {
-          console.log(`Cart item ${itemId} already removed`); // Changed to log
+          console.log(`Cart item ${itemId} already removed`);
           return { success: true, id: itemId, alreadyRemoved: true };
         }
         
@@ -417,7 +425,31 @@ export const customerApi = {
         const res = await authFetch(`${Endpoints.customer.orders}?${params.toString()}`);
         
         if (!res.ok) return { data: [], meta: { total: 0, current_page: page, last_page: 1 } };
-        return await res.json();
+        
+        const response = await res.json();
+        
+        let orders = [];
+        if (response.orders && Array.isArray(response.orders)) {
+          orders = response.orders;
+        } else if (response.data && Array.isArray(response.data)) {
+          orders = response.data;
+        } else if (Array.isArray(response)) {
+          orders = response;
+        }
+        
+        const transformedOrders = orders.map((order: any) => ({
+          ...order,
+          reference: order.order_reference || order.reference || order.id,
+        }));
+        
+        return {
+          data: transformedOrders,
+          meta: response.meta || {
+            total: transformedOrders.length,
+            current_page: page,
+            last_page: 1
+          }
+        };
       } catch {
         return { data: [], meta: { total: 0, current_page: page, last_page: 1 } };
       }
@@ -434,7 +466,12 @@ export const customerApi = {
         }
         
         const data = await res.json();
-        return data.order || data;
+        const order = data.order || data;
+        
+        return {
+          ...order,
+          reference: order.order_reference || order.reference || reference,
+        } as CustomerOrder;
       } catch (error) {
         console.error(`Error fetching order ${reference}:`, error);
         throw error;
@@ -505,36 +542,104 @@ export const customerApi = {
       }
     },
     
-  remove: async (id: number) => {
-  try {
-    const res = await authFetch(Endpoints.customer.wishlistItem(id), {
-      method: 'DELETE',
-    });
-    
-    if (res.status === 404) {
-      console.log(`Wishlist item ${id} already removed`); 
-      return { success: true, id, alreadyRemoved: true };
-    }
-    
-    if (!res.ok) {
-      throw new Error(`Failed to remove from wishlist (${res.status})`);
-    }
-    
-    if (res.status === 204) return { success: true, id };
-    
-    const responseText = await res.text();
-    try {
-      return responseText ? JSON.parse(responseText) : { success: true, id };
-    } catch {
-      return { success: true, id };
-    }
-  } catch (error) {
-    console.error('Error removing from wishlist:', error);
-    if (error instanceof Error && error.message.includes('404')) {
-      return { success: true, id, alreadyRemoved: true };
-    }
-    throw error;
-  }
-},
+    remove: async (id: number) => {
+      console.log('🔥🔥🔥 WISHLIST REMOVE DEBUG START 🔥🔥🔥');
+      console.log('1. Input ID received:', id, 'Type:', typeof id);
+      
+      try {
+        const token = getToken();
+        console.log('2. User authenticated:', !!token);
+        
+        console.log('3. Fetching wishlist from:', Endpoints.customer.wishlist);
+        const wishlistRes = await authFetch(Endpoints.customer.wishlist);
+        console.log('4. Wishlist response status:', wishlistRes.status);
+        
+        const wishlistData = await wishlistRes.json();
+        console.log('5. Raw wishlist data:', wishlistData);
+        
+        let items: WishlistItem[] = [];
+        if (Array.isArray(wishlistData)) {
+          items = wishlistData as WishlistItem[];
+          console.log('6. Response is direct array with', items.length, 'items');
+        } else if (wishlistData.data && Array.isArray(wishlistData.data)) {
+          items = wishlistData.data as WishlistItem[];
+          console.log('6. Response has data array with', items.length, 'items');
+        } else if (wishlistData.wishlist && Array.isArray(wishlistData.wishlist)) {
+          items = wishlistData.wishlist as WishlistItem[];
+          console.log('6. Response has wishlist array with', items.length, 'items');
+        } else {
+          console.log('6. No array found in response');
+        }
+        
+        console.log('7. Extracted items:', items);
+        
+        const itemById = items.find((item: WishlistItem) => item.id === id || Number(item.id) === id);
+        const itemByProductId = items.find((item: WishlistItem) => item.product_id === id || Number(item.product_id) === id);
+        
+        console.log('8. Item found by id match:', itemById);
+        console.log('9. Item found by product_id match:', itemByProductId);
+        
+        const wishlistItem = itemById || itemByProductId;
+        
+        if (!wishlistItem) {
+          console.log('10. ❌ ITEM NOT FOUND IN WISHLIST');
+          console.log('Available IDs:', items.map((item: WishlistItem) => ({ id: item.id, product_id: item.product_id })));
+          console.log('🔥🔥🔥 WISHLIST REMOVE DEBUG END - NOT FOUND 🔥🔥🔥');
+          return { success: true, id, alreadyRemoved: true };
+        }
+        
+        console.log('10. ✅ FOUND ITEM:', wishlistItem);
+        
+        const wishlistItemId = wishlistItem.id;
+        console.log('11. Using wishlist item ID for deletion:', wishlistItemId);
+        
+        const deleteUrl = Endpoints.customer.wishlistItem(wishlistItemId);
+        console.log('12. DELETE URL:', deleteUrl);
+        
+        const res = await authFetch(deleteUrl, {
+          method: 'DELETE',
+        });
+        
+        console.log('13. DELETE response status:', res.status);
+        
+        if (res.status === 404) {
+          console.log('14. Item already removed or not found');
+          console.log('🔥🔥🔥 WISHLIST REMOVE DEBUG END - ALREADY REMOVED 🔥🔥🔥');
+          return { success: true, id: wishlistItemId, alreadyRemoved: true };
+        }
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('15. Error response:', errorText);
+          throw new Error(`Failed to remove from wishlist (${res.status})`);
+        }
+        
+        if (res.status === 204) {
+          console.log('16. ✅ Successfully removed (204 No Content)');
+          console.log('🔥🔥🔥 WISHLIST REMOVE DEBUG END - SUCCESS 🔥🔥🔥');
+          return { success: true, id: wishlistItemId };
+        }
+        
+        const responseText = await res.text();
+        console.log('16. Response:', responseText);
+        console.log('🔥🔥🔥 WISHLIST REMOVE DEBUG END - SUCCESS 🔥🔥🔥');
+        
+        try {
+          return responseText ? JSON.parse(responseText) : { success: true, id: wishlistItemId };
+        } catch {
+          return { success: true, id: wishlistItemId };
+        }
+        
+      } catch (error) {
+        console.error('🔥🔥🔥 WISHLIST REMOVE DEBUG ERROR 🔥🔥🔥');
+        console.error('Error:', error);
+        console.log('🔥🔥🔥 WISHLIST REMOVE DEBUG END - ERROR 🔥🔥🔥');
+        
+        if (error instanceof Error && error.message.includes('404')) {
+          return { success: true, id, alreadyRemoved: true };
+        }
+        throw error;
+      }
+    },
   },
 } as const;

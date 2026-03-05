@@ -27,7 +27,7 @@ export const AdminEndpoints = {
   tags: `${API_BASE}/api/tags`,
   tagDetail: (id: number | string) => `${API_BASE}/api/tags/${id}`,
   productMedia: (id: number | string) => `${API_BASE}/api/products/${id}/media`,
-  
+
   
   // Orders
   orders: `${API_BASE}/api/admin/orders`,
@@ -78,8 +78,8 @@ brandDetail: (slug: string) => `${API_BASE}/api/brands/${slug}`,
   productDetail: (id: number | string) => `${API_BASE}/api/products/${id}`,
   cart: `${API_BASE}/api/cart`,
   cartAdd: `${API_BASE}/api/cart/add`,
-  cartUpdate: (id: number | string) => `${API_BASE}/api/cart/${id}`,
-  cartRemove: (id: number | string) => `${API_BASE}/api/cart/${id}`,
+  cartUpdate: (id: number | string) => `${API_BASE}/api/cart/items/${id}`,  
+  cartRemove: (id: number | string) => `${API_BASE}/api/cart/items/${id}`,  
   cartMerge: `${API_BASE}/api/cart/merge`,
   checkout: `${API_BASE}/api/checkout`,
   verifyPayment: `${API_BASE}/api/verify-payment`,

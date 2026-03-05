@@ -159,7 +159,8 @@ export interface CustomerOrder {
   id: number;
   user_id: number;
   session_id: string | null;
-  order_reference: string;
+  order_reference: string;        
+  reference?: string;
   subtotal: number;
   delivery_fee: string;
   total: number;
@@ -300,7 +301,7 @@ export interface CheckoutResponse {
     id: number;
     user_id: number;
     session_id: string | null;
-    order_reference: string;  // ✅ This is what
+    order_reference: string;  
     subtotal: number;
     delivery_fee: string;
     total: number;

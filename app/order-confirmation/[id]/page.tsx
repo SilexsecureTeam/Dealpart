@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -75,6 +75,13 @@ export default function OrderConfirmationPage() {
   // Use the customer order hook
   const { data: order, isLoading, error } = useCustomerOrder(orderReference);
 
+   console.log('🔍 Page Debug:');
+  console.log('  - orderReference from URL:', orderReference);
+  console.log('  - isLoading:', isLoading);
+  console.log('  - error:', error);
+  console.log('  - order:', order);
+  console.log('  - order?.order_reference:', order?.order_reference);
+
   const handleImageError = (itemId: number) => {
     setImageErrors(prev => ({ ...prev, [itemId]: true }));
   };
@@ -84,8 +91,8 @@ export default function OrderConfirmationPage() {
   };
 
   const handleTrackOrder = () => {
-    // You can implement tracking page or redirect to account
-    router.push(`/account/orders/${order?.order_reference}`);
+    // Use order_reference from the order object
+    router.push(`/account/orders/${order?.order_reference || orderReference}`);
   };
 
   if (isLoading) {
@@ -192,6 +199,7 @@ export default function OrderConfirmationPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Order Reference</p>
+                {/* FIXED: Use order.order_reference instead of order.reference */}
                 <p className="text-xl font-bold text-gray-900">{order.order_reference}</p>
                 <p className="text-sm text-gray-500 mt-1">Placed on {formatDate(order.created_at)}</p>
               </div>

@@ -23,8 +23,17 @@ export const useCustomerOrder = (orderReference: string) => {
           throw new Error('Order not found');
         }
         
-        console.log('Customer order fetched:', order);
-        return order as CustomerOrder;
+        console.log('Raw customer order fetched:', order);
+        
+        // Ensure the order has a reference field (map from order_reference if needed)
+        const processedOrder = {
+          ...order,
+          // If the API returns order_reference but your component expects reference
+          reference: order.order_reference || order.reference || orderReference,
+        };
+        
+        console.log('Processed order:', processedOrder);
+        return processedOrder as CustomerOrder;
       } catch (error) {
         console.error(`Error fetching order ${orderReference}:`, error);
         throw error;
@@ -45,10 +54,20 @@ export const useCustomerOrders = (page: number = 1, limit: number = 10) => {
         // Using the customerApi.orders.list method
         const response = await customerApi.orders.list(page, limit);
         
-        console.log('Customer orders response:', response);
+        console.log('Raw customer orders response:', response);
+        
+        const orders = response?.data || [];
+        
+        // Process each order to ensure reference field exists
+        const processedOrders = orders.map((order: any) => ({
+          ...order,
+          reference: order.order_reference || order.reference || order.id,
+        }));
+        
+        console.log('Processed orders:', processedOrders);
         
         return {
-          orders: response?.data || [],
+          orders: processedOrders,
           total: response?.meta?.total || 0,
           currentPage: response?.meta?.current_page || page,
           lastPage: response?.meta?.last_page || 1,
@@ -87,14 +106,13 @@ export const useTrackOrder = (orderReference: string) => {
       }
     },
     enabled: !!orderReference,
-    staleTime: 1 * 60 * 1000, // 1 minute (more frequent updates for tracking)
+    staleTime: 1 * 60 * 1000, 
     retry: 2,
   });
 };
 
-// Optional: Hook to cancel order - FIXED
 export const useCancelOrder = () => {
-  const queryClient = useQueryClient(); // <-- ADD THIS LINE
+  const queryClient = useQueryClient(); 
   
   return useMutation({
     mutationFn: async (orderReference: string) => {
