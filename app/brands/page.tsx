@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Search, Loader2, ChevronRight, Camera } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Search, Loader2, ChevronRight, Camera, LogIn } from 'lucide-react';
 
 interface Brand {
   id: number;
@@ -16,46 +17,79 @@ interface Brand {
 }
 
 export default function BrandsPage() {
+  const router = useRouter();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [filteredBrands, setFilteredBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fetch brands
+  // Check authentication and fetch brands
   useEffect(() => {
-    const fetchBrands = async () => {
+    const checkAuthAndFetchBrands = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        const token = localStorage.getItem('adminToken');
+        // Get customer token (not admin token)
+        const token = localStorage.getItem('customerToken');
+        
+        if (!token) {
+          // User is not logged in
+          setIsAuthenticated(false);
+          
+          // Try fetching without token first (in case endpoint is actually public)
+          console.log('No token found, attempting public fetch...');
+          const publicResponse = await fetch('https://admin.bezalelsolar.com/api/brand', {
+            headers: {
+              'Accept': 'application/json',
+            },
+          });
+          
+          if (publicResponse.ok) {
+            // Endpoint is public! Process the data
+            setIsAuthenticated(true); // They can view brands even without login
+            const data = await publicResponse.json();
+            processBrandsData(data);
+            return;
+          }
+          
+          // If public fetch fails with 401, show login prompt
+          if (publicResponse.status === 401) {
+            setError('AUTH_REQUIRED');
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // User has token, try authenticated fetch
+        setIsAuthenticated(true);
+        console.log('Fetching brands with authentication...');
+        
         const response = await fetch('https://admin.bezalelsolar.com/api/brand', {
           headers: {
             'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : '',
+            'Authorization': `Bearer ${token}`,
           },
         });
+
+        if (response.status === 401) {
+          // Token might be expired or invalid
+          localStorage.removeItem('customerToken');
+          localStorage.removeItem('customerUser');
+          setError('SESSION_EXPIRED');
+          setIsLoading(false);
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`Failed to load brands: ${response.status}`);
         }
 
         const data = await response.json();
-        
-        // Handle response format
-        let brandsData: Brand[] = [];
-        if (data?.brands && Array.isArray(data.brands)) {
-          brandsData = data.brands;
-        } else if (data?.data && Array.isArray(data.data)) {
-          brandsData = data.data;
-        } else if (Array.isArray(data)) {
-          brandsData = data;
-        }
-
-        setBrands(brandsData);
-        setFilteredBrands(brandsData);
+        processBrandsData(data);
         
       } catch (err: any) {
         console.error('Error fetching brands:', err);
@@ -65,8 +99,28 @@ export default function BrandsPage() {
       }
     };
 
-    fetchBrands();
+    checkAuthAndFetchBrands();
   }, []);
+
+  // Process brands data from API
+  const processBrandsData = (data: any) => {
+    // Handle different response formats
+    let brandsData: Brand[] = [];
+    
+    if (data?.brands && Array.isArray(data.brands)) {
+      brandsData = data.brands;
+    } else if (data?.data && Array.isArray(data.data)) {
+      brandsData = data.data;
+    } else if (Array.isArray(data)) {
+      brandsData = data;
+    } else if (data && typeof data === 'object') {
+      // If it's a single brand object
+      brandsData = [data];
+    }
+
+    setBrands(brandsData);
+    setFilteredBrands(brandsData);
+  };
 
   // Handle search
   useEffect(() => {
@@ -114,6 +168,11 @@ export default function BrandsPage() {
     return colors[sum % colors.length];
   };
 
+  const handleLoginRedirect = () => {
+    router.push('/login?redirect=/brands');
+  };
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -125,6 +184,34 @@ export default function BrandsPage() {
     );
   }
 
+  // Authentication required state
+  if (error === 'AUTH_REQUIRED' || error === 'SESSION_EXPIRED') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <LogIn className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {error === 'SESSION_EXPIRED' ? 'Session Expired' : 'Login Required'}
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {error === 'SESSION_EXPIRED' 
+              ? 'Your session has expired. Please login again to continue.'
+              : 'Please login to view our brands and products.'}
+          </p>
+          <button
+            onClick={handleLoginRedirect}
+            className="px-6 py-3 bg-[#4EA674] text-white rounded-lg hover:bg-[#3D8B59] transition-colors font-medium w-full"
+          >
+            Login Now
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -176,6 +263,20 @@ export default function BrandsPage() {
               className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
             />
           </div>
+
+          {/* Authentication status indicator */}
+          {!isAuthenticated && (
+            <div className="mt-4 text-sm text-white/80 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>You're viewing brands in read-only mode.</span>
+              <button 
+                onClick={handleLoginRedirect}
+                className="underline hover:text-white"
+              >
+                Login to see products
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -213,7 +314,13 @@ export default function BrandsPage() {
                 return (
                   <Link
                     key={brand.id}
-                    href={`/brands/${brand.slug || brand.id}`}
+                    href={isAuthenticated ? `/brands/${brand.slug || brand.id}` : '#'}
+                    onClick={(e) => {
+                      if (!isAuthenticated) {
+                        e.preventDefault();
+                        handleLoginRedirect();
+                      }
+                    }}
                     className="group"
                   >
                     <div className="bg-white rounded-xl shadow-sm hover:shadow-md border border-gray-200 p-6 transition-all hover:border-[#4EA674] hover:-translate-y-1">
@@ -251,7 +358,11 @@ export default function BrandsPage() {
                         {/* View Products Link */}
                         <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                           <span className="text-xs text-[#4EA674] font-medium inline-flex items-center gap-1">
-                            View Products <ChevronRight className="w-3 h-3" />
+                            {isAuthenticated ? (
+                              <>View Products <ChevronRight className="w-3 h-3" /></>
+                            ) : (
+                              <>Login to view <LogIn className="w-3 h-3" /></>
+                            )}
                           </span>
                         </div>
                       </div>

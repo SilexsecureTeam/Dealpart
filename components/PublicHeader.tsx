@@ -402,14 +402,14 @@ export default function PublicHeader() {
                     </Link>
                     <Link
                       href="/wishlist"
-                      className="block px-4 py-3 text-sm hover:bg-gray-50"
+                      className="block px-4 py-3 text-black text-sm hover:bg-gray-50"
                       onClick={() => setUserMenuOpen(false)}
                     >
                       Wishlist
                     </Link>
                     <Link
                       href="/account/addresses"
-                      className="block px-4 py-3 text-sm hover:bg-gray-50"
+                      className="block px-4 py-3 text-black text-sm hover:bg-gray-50"
                       onClick={() => setUserMenuOpen(false)}
                     >
                       My Addresses
@@ -507,9 +507,9 @@ export default function PublicHeader() {
               <Link href="/" className="text-[#4EA674] border-b-2 border-[#4EA674]">
                 Home
               </Link>
-              <Link href="/about" className="hover:text-[#4EA674]">
-                About Us
-              </Link>
+              <Link href="/about-us" className="text-gray-700 hover:text-blue-600">
+  About Us
+</Link>
               <Link href="/contact" className="hover:text-[#4EA674]">
                 Contact Us
               </Link>

@@ -39,38 +39,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsAdmin(isAdminRoute);
   }, [pathname]);
 
-  // Sync token across both storage keys
+  // Sync token across ALL storage keys (admin, user, customer)
   const syncToken = (newToken: string | null) => {
     if (newToken) {
       localStorage.setItem('adminToken', newToken);
       localStorage.setItem('token', newToken);
+      localStorage.setItem('customerToken', newToken); 
     } else {
       localStorage.removeItem('adminToken');
       localStorage.removeItem('token');
+      localStorage.removeItem('customerToken'); 
     }
     setToken(newToken);
   };
 
-  // Sync user across both storage keys
+  // Sync user across ALL storage keys (admin, user, customer)
   const syncUser = (newUser: User | null) => {
     if (newUser) {
       localStorage.setItem('adminUser', JSON.stringify(newUser));
       localStorage.setItem('user', JSON.stringify(newUser));
+      localStorage.setItem('customerUser', JSON.stringify(newUser)); 
       
-      // Set isAdmin based on user role - FIXED
+  
       setIsAdmin(adminRoles.includes(newUser.role));
     } else {
       localStorage.removeItem('adminUser');
       localStorage.removeItem('user');
+      localStorage.removeItem('customerUser'); 
       setIsAdmin(false);
     }
     setUser(newUser);
   };
 
-  // Load token and user from localStorage on mount
+  
   useEffect(() => {
-    const storedToken = localStorage.getItem('adminToken') || localStorage.getItem('token');
-    const storedUser = localStorage.getItem('adminUser') || localStorage.getItem('user');
+    // Check all possible token storage keys
+    const storedToken = localStorage.getItem('adminToken') || 
+                        localStorage.getItem('token') || 
+                        localStorage.getItem('customerToken'); 
+    
+    // Check all possible user storage keys
+    const storedUser = localStorage.getItem('adminUser') || 
+                       localStorage.getItem('user') || 
+                       localStorage.getItem('customerUser'); 
     
     if (storedToken && storedUser) {
       try {
@@ -78,22 +89,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setToken(storedToken);
         setUser(parsedUser);
         
-        // Set isAdmin based on user role - FIXED
+        // Set isAdmin based on user role
         setIsAdmin(adminRoles.includes(parsedUser.role));
         
-        // Ensure both storage locations have the data
+        // Ensure all storage locations have the data
         if (!localStorage.getItem('adminToken') && adminRoles.includes(parsedUser.role)) {
           localStorage.setItem('adminToken', storedToken);
+          localStorage.setItem('adminUser', storedUser);
         }
-        if (!localStorage.getItem('token') && parsedUser.role === 'user') {
+        if (!localStorage.getItem('token')) {
           localStorage.setItem('token', storedToken);
+          localStorage.setItem('user', storedUser);
+        }
+        if (!localStorage.getItem('customerToken') && parsedUser.role === 'user') {
+          localStorage.setItem('customerToken', storedToken); // ✅ ADD THIS
+          localStorage.setItem('customerUser', storedUser); // ✅ ADD THIS
         }
       } catch (error) {
         console.error('Failed to parse stored user', error);
         localStorage.removeItem('adminToken');
         localStorage.removeItem('token');
+        localStorage.removeItem('customerToken'); // ✅ ADD THIS
         localStorage.removeItem('adminUser');
         localStorage.removeItem('user');
+        localStorage.removeItem('customerUser'); // ✅ ADD THIS
       }
     }
     setIsLoading(false);
@@ -101,13 +120,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Refresh user profile from API - NOW WORKS FOR BOTH ROLES
   const refreshUser = async () => {
-    const currentToken = token || localStorage.getItem('adminToken') || localStorage.getItem('token');
+    const currentToken = token || localStorage.getItem('adminToken') || 
+                        localStorage.getItem('token') || 
+                        localStorage.getItem('customerToken'); // ✅ ADD THIS
     if (!currentToken) return;
     
     try {
       let response;
       
-      // Determine which endpoint to use based on role or URL - FIXED
+      // Determine which endpoint to use based on role or URL
       const isAdminUser = (user && adminRoles.includes(user.role)) || isAdmin;
       
       if (isAdminUser) {
@@ -182,7 +203,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     syncToken(token);
     syncUser(user);
     
-    // Redirect based on role - FIXED
+    // Redirect based on role
     if (adminRoles.includes(user.role)) {
       router.push('/admin');
     } else {
@@ -216,6 +237,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = () => {
     syncToken(null);
     syncUser(null);
+    
+    // Also clear customer-specific keys just to be safe
+    localStorage.removeItem('customerToken');
+    localStorage.removeItem('customerUser');
     
     // Redirect based on where we are
     if (isAdmin) {

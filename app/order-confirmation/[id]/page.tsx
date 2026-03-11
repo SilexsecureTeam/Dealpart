@@ -1,3 +1,4 @@
+// app/order-confirmation/[reference]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,10 +20,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// ---------- Hooks ----------
-import { useCustomerOrder } from '@/hooks/useCustomerOrder'; 
+import { useCustomerOrder } from '@/hooks/useCustomerOrder';
 
-// ---------- Helpers ----------
 const formatCurrency = (amount: number | string) => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return `₦${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -47,40 +46,52 @@ const formatDate = (dateString: string) => {
 
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'processing':
-      return 'bg-blue-100 text-blue-800';
-    case 'confirmed':
-      return 'bg-green-100 text-green-800';
-    case 'shipped':
-      return 'bg-purple-100 text-purple-800';
-    case 'delivered':
-      return 'bg-green-100 text-green-800';
+    case 'pending': return 'bg-yellow-100 text-yellow-800';
+    case 'processing': return 'bg-blue-100 text-blue-800';
+    case 'confirmed': return 'bg-green-100 text-green-800';
+    case 'shipped': return 'bg-purple-100 text-purple-800';
+    case 'delivered': return 'bg-green-100 text-green-800';
     case 'cancelled':
-    case 'canceled':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
+    case 'canceled': return 'bg-red-100 text-red-800';
+    default: return 'bg-gray-100 text-gray-800';
   }
 };
 
 export default function OrderConfirmationPage() {
   const router = useRouter();
   const params = useParams();
-  const orderReference = params.reference as string;
+  const orderReference = params?.reference as string;
   
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
-  // Use the customer order hook
-  const { data: order, isLoading, error } = useCustomerOrder(orderReference);
-
-   console.log('🔍 Page Debug:');
+  console.log('🔍 Order Confirmation Page Debug:');
+  console.log('  - Full params object:', params);
   console.log('  - orderReference from URL:', orderReference);
+  console.log('  - orderReference type:', typeof orderReference);
+  console.log('  - orderReference length:', orderReference?.length);
+
+  // Only fetch if we have a valid order reference
+  const shouldFetch = orderReference && orderReference.length > 0;
+  const { data: order, isLoading, error } = useCustomerOrder(shouldFetch ? orderReference : '');
+
+  console.log('  - shouldFetch:', shouldFetch);
   console.log('  - isLoading:', isLoading);
   console.log('  - error:', error);
   console.log('  - order:', order);
   console.log('  - order?.order_reference:', order?.order_reference);
+
+  useEffect(() => {
+    if (!shouldFetch) {
+      console.log('⏳ Waiting for order reference...');
+      const timer = setTimeout(() => {
+        if (!orderReference) {
+          console.log('❌ No order reference after delay, redirecting to orders');
+          router.push('/orders');
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldFetch, orderReference, router]);
 
   const handleImageError = (itemId: number) => {
     setImageErrors(prev => ({ ...prev, [itemId]: true }));
@@ -91,9 +102,21 @@ export default function OrderConfirmationPage() {
   };
 
   const handleTrackOrder = () => {
-    // Use order_reference from the order object
-    router.push(`/account/orders/${order?.order_reference || orderReference}`);
+    if (order?.order_reference) {
+      router.push(`/account/orders/${order.order_reference}`);
+    }
   };
+
+  if (!shouldFetch) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#EAF8E7] to-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 animate-spin text-[#4EA674] mx-auto mb-4" />
+          <p className="text-gray-600">Loading your order...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -115,20 +138,19 @@ export default function OrderConfirmationPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Order Not Found</h2>
           <p className="text-gray-600 mb-6">
-            We couldn't find your order. Please check the order reference or contact support.
+            We couldn't find your order. Please check your orders list.
           </p>
           <Link
-            href="/shop"
+            href="/orders"
             className="inline-block px-6 py-3 bg-[#4EA674] text-white rounded-lg font-medium hover:bg-[#3D8B59] transition"
           >
-            Continue Shopping
+            View My Orders
           </Link>
         </div>
       </div>
     );
   }
 
-  // Calculate estimated delivery (3-5 business days from order date)
   const orderDate = new Date(order.created_at);
   const estimatedDelivery = new Date(orderDate);
   estimatedDelivery.setDate(orderDate.getDate() + 5);
@@ -136,7 +158,6 @@ export default function OrderConfirmationPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#EAF8E7] to-white">
       <div className="container mx-auto px-4 py-8 md:py-12 max-w-4xl">
-        {/* Breadcrumb */}
         <div className="text-sm text-gray-600 mb-8 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-[#4EA674] flex items-center gap-1">
             <Home className="w-4 h-4" />
@@ -150,7 +171,6 @@ export default function OrderConfirmationPage() {
           <span className="text-[#4EA674] font-medium">Order Confirmation</span>
         </div>
 
-        {/* Success Message */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
@@ -164,7 +184,6 @@ export default function OrderConfirmationPage() {
           </p>
         </div>
 
-        {/* Order Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <Package className="w-8 h-8 text-[#4EA674] mb-3" />
@@ -192,14 +211,11 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
 
-        {/* Order Details */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-8">
-          {/* Order Header */}
           <div className="border-b border-gray-200 p-6 md:p-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Order Reference</p>
-                {/* FIXED: Use order.order_reference instead of order.reference */}
                 <p className="text-xl font-bold text-gray-900">{order.order_reference}</p>
                 <p className="text-sm text-gray-500 mt-1">Placed on {formatDate(order.created_at)}</p>
               </div>
@@ -221,12 +237,10 @@ export default function OrderConfirmationPage() {
             </div>
           </div>
 
-          {/* Order Items */}
           <div className="p-6 md:p-8">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Order Items</h2>
             <div className="space-y-4">
               {order.items.map((item) => {
-                // Get the image URL from the product data
                 const imageUrl = item.product?.image_urls?.[0]?.url || 
                                 (item.product?.images?.[0]?.path ? 
                                   `https://admin.bezalelsolar.com/storage/${item.product.images[0].path}` : 
@@ -273,7 +287,6 @@ export default function OrderConfirmationPage() {
             </div>
           </div>
 
-          {/* Price Summary */}
           <div className="bg-gray-50 p-6 md:p-8">
             <div className="max-w-sm ml-auto">
               <div className="space-y-3">
@@ -312,7 +325,6 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
 
-        {/* Shipping Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -355,7 +367,6 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/shop"
@@ -364,7 +375,7 @@ export default function OrderConfirmationPage() {
             Continue Shopping
           </Link>
           <Link
-            href="/account/orders"
+            href="/orders"
             className="px-8 py-4 border-2 border-[#4EA674] text-[#4EA674] rounded-xl font-medium hover:bg-[#4EA674]/10 transition text-center"
           >
             View All Orders
